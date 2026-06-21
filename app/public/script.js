@@ -1,5 +1,20 @@
 let isLoginMode = true;
 let currentUser = null;
+const SESSION_KEY = 'o11ylab_session';
+const SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
+
+// Restaurar sessao ao carregar a pagina
+(function restoreSession() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
+        if (saved && saved.username && saved.expiresAt && Date.now() < saved.expiresAt) {
+            currentUser = saved.username;
+            showDashboard();
+        }
+    } catch (e) {
+        localStorage.removeItem(SESSION_KEY);
+    }
+})();
 
 // DOM Elements
 const loginView = document.getElementById('login-view');
@@ -46,11 +61,16 @@ authForm.addEventListener('submit', async (e) => {
         const data = await res.json();
         
         if (res.ok) {
-            showToast(isLoginMode ? 'Login efetuado!' : 'Conta criada!', 'success');
             if (isLoginMode) {
                 currentUser = username;
+                localStorage.setItem(SESSION_KEY, JSON.stringify({
+                    username: username,
+                    expiresAt: Date.now() + SESSION_EXPIRY_MS
+                }));
                 showDashboard();
+                showToast('Login efetuado! Sessao salva por 30 min.', 'success');
             } else {
+                showToast('Conta criada! Voce ja pode logar.', 'success');
                 tabLogin.click();
                 document.getElementById('password').value = '';
             }
@@ -78,6 +98,7 @@ function showDashboard() {
 
 logoutBtn.addEventListener('click', () => {
     currentUser = null;
+    localStorage.removeItem(SESSION_KEY);
     dashboardView.classList.remove('active');
     setTimeout(() => {
         dashboardView.style.display = 'none';

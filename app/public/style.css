@@ -49,6 +49,8 @@ body {
 .login-card h1 { font-weight: 800; font-size: 2rem; margin-bottom: 0.25rem; }
 .login-card h1 span { color: var(--primary); }
 .login-card p { color: var(--text-secondary); margin-bottom: 1.5rem; }
+.login-info { margin-top: 1rem; text-align: center; }
+.login-info p { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem; opacity: 0.7; }
 
 .tabs { display: flex; margin-bottom: 1.5rem; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 4px; }
 .tab-btn { flex: 1; padding: 0.5rem; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; border-radius: 6px; transition: all 0.2s; font-weight: 600; }
