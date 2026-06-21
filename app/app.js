@@ -124,9 +124,10 @@ app.get('/metrics', async (req, res) => {
     res.end(await promClient.register.metrics());
 });
 
+// GET / — Redireciona para o dashboard web
 app.get('/', (req, res) => {
-    logger.info('Rota raiz acessada', { path: '/' });
-    res.status(200).send('Laboratório de Observabilidade - API funcionando!');
+    logger.info('Rota raiz acessada — redirecionando para dashboard', { path: '/' });
+    res.redirect('/index.html');
 });
 
 app.get('/health', (req, res) => {
