@@ -4,10 +4,10 @@ const app = require('../app');
 describe('API de Observabilidade', () => {
 
     describe('GET /', () => {
-        test('deve retornar 200 com mensagem de boas-vindas', async () => {
+        test('deve redirecionar para o dashboard HTML (302)', async () => {
             const res = await request(app).get('/');
-            expect(res.statusCode).toBe(200);
-            expect(res.text).toContain('API funcionando');
+            expect(res.statusCode).toBe(302);
+            expect(res.headers.location).toBe('/index.html');
         });
     });
 
