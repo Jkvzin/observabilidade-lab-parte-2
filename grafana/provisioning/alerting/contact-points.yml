@@ -1,0 +1,14 @@
+# Contact points (pontos de notificação) para os alertas
+# Para ativar notificações reais, configure um receiver (email, Slack, Telegram, etc.)
+# Doc: https://grafana.com/docs/grafana/latest/alerting/configure-notifications/
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: "Default"
+    receivers:
+      - uid: default-receiver
+        type: email
+        settings:
+          addresses: "admin@example.com"
+        disableResolveMessage: false
