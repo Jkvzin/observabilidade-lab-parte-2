@@ -77,6 +77,54 @@ Pipeline GitHub Actions em `.github/workflows/ci.yml`:
 - Build Docker
 - Deploy via Render Deploy Hook
 
+---
+
+## ☁️ Deploy no Render
+
+O Render é uma plataforma cloud que oferece deploy automático a partir de repositórios GitHub. Siga os passos abaixo para publicar a API.
+
+### Pré-requisitos
+- Conta no [Render](https://render.com) (login com GitHub recomendado)
+- Repositório conectado ao GitHub
+
+### Passo a passo
+
+1. **Crie uma conta no Render**  
+   Acesse [render.com](https://render.com) e faça login com sua conta do GitHub.
+
+2. **Crie um novo Web Service**  
+   No dashboard, clique em **New +** → **Web Service** e selecione o repositório `Jkvzin/observabilidade-lab-parte-2`.
+
+3. **Configure o serviço:**
+   | Campo | Valor |
+   |---|---|
+   | **Name** | `observabilidade-api` |
+   | **Root Directory** | `app` |
+   | **Runtime** | Node |
+   | **Build Command** | `npm install` |
+   | **Start Command** | `npm start` |
+   | **Health Check Path** | `/health` |
+
+4. **Variáveis de ambiente** (opcional):  
+   A aplicação já usa `PORT` dinâmico via `process.env.PORT || 3001`, então não é necessário configurar nada adicional.
+
+5. **Clique em "Create Web Service"**  
+   O Render fará o build automaticamente e disponibilizará a API em uma URL pública (ex: `https://observabilidade-api.onrender.com`).
+
+### Deploy Hook (GitHub Actions)
+
+Para integrar o deploy automático com GitHub Actions, configure a action `render-deploy` no seu workflow:
+
+```yaml
+- name: Trigger Render Deploy
+  run: |
+    curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+```
+
+> O **Deploy Hook URL** pode ser encontrado nas configurações do Web Service no Render, na seção **Settings → Deploy Hook**.
+
+O Render também oferece deploy automático em cada push na branch principal — não é obrigatório configurar a action se preferir o auto-deploy nativo.
+
 ## Testes
 
 ```bash
