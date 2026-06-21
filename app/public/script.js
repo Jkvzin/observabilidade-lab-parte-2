@@ -31,7 +31,7 @@ tabRegister.addEventListener('click', () => {
 // Auth Submit
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('username').value;
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
     const endpoint = isLoginMode ? '/login' : '/register';
@@ -46,18 +46,19 @@ authForm.addEventListener('submit', async (e) => {
         const data = await res.json();
         
         if (res.ok) {
-            showToast(isLoginMode ? 'Login efetuado com sucesso!' : 'Conta criada! Você já pode logar.', 'success');
+            showToast(isLoginMode ? 'Login efetuado!' : 'Conta criada!', 'success');
             if (isLoginMode) {
                 currentUser = username;
                 showDashboard();
             } else {
                 tabLogin.click();
+                document.getElementById('password').value = '';
             }
         } else {
-            showToast(data.error || 'Erro na autenticação', 'error');
+            showToast(data.error || 'Erro na autenticacao', 'error');
         }
     } catch (err) {
-        showToast('Erro de conexão com a API', 'error');
+        showToast('Erro de conexao com a API', 'error');
     }
 });
 
@@ -67,10 +68,12 @@ function showDashboard() {
         loginView.style.display = 'none';
         dashboardView.style.display = 'flex';
         setTimeout(() => dashboardView.classList.add('active'), 50);
-    }, 400); // Wait for fade out
+    }, 400);
     
     currentUserDisplay.innerText = currentUser;
     loadUsers();
+    updateStats();
+    checkHealth();
 }
 
 logoutBtn.addEventListener('click', () => {
@@ -85,7 +88,8 @@ logoutBtn.addEventListener('click', () => {
     document.getElementById('password').value = '';
 });
 
-// Load Users (CRUD)
+// ==================== CRUD ====================
+
 async function loadUsers() {
     try {
         const res = await fetch('/users');
@@ -94,57 +98,232 @@ async function loadUsers() {
         usersList.innerHTML = users.map(u => `
             <tr>
                 <td>#${u.id}</td>
-                <td>${u.username}</td>
-                <td>
-                    <button class="btn-secondary" onclick="deleteUser(${u.id})" style="color: var(--danger); border-color: var(--danger); padding: 0.25rem 0.5rem; font-size: 0.8rem;">Deletar</button>
+                <td><strong>${escapeHtml(u.username)}</strong></td>
+                <td>${new Date().toLocaleDateString()}</td>
+                <td class="actions-cell">
+                    <button class="btn-sm btn-edit" onclick="startEdit(${u.id}, '${escapeHtml(u.username)}')">Editar</button>
+                    <button class="btn-sm btn-delete" onclick="deleteUser(${u.id})">Deletar</button>
                 </td>
             </tr>
         `).join('');
+        
+        document.getElementById('stat-users').innerText = users.length;
     } catch (err) {
-        showToast('Erro ao carregar usuários', 'error');
+        showToast('Erro ao carregar usuarios', 'error');
+    }
+}
+
+async function createUser() {
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value;
+    
+    if (!username || !password) {
+        document.getElementById('create-message').innerText = 'Preencha todos os campos';
+        return;
+    }
+    
+    try {
+        const res = await fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            document.getElementById('create-message').innerHTML = '<span style="color:var(--success)">Usuario criado!</span>';
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            loadUsers();
+            updateStats();
+            showToast(`Usuario "${username}" criado`, 'success');
+        } else {
+            document.getElementById('create-message').innerHTML = `<span style="color:var(--danger)">${data.error}</span>`;
+        }
+    } catch (err) {
+        document.getElementById('create-message').innerText = 'Erro de conexao';
+    }
+}
+
+let editingUserId = null;
+
+function startEdit(id, currentUsername) {
+    editingUserId = id;
+    document.getElementById('edit-user-id').innerText = '#' + id;
+    document.getElementById('edit-username').value = currentUsername;
+    document.getElementById('edit-password').value = '';
+    document.getElementById('edit-form').style.display = 'block';
+}
+
+function cancelEdit() {
+    editingUserId = null;
+    document.getElementById('edit-form').style.display = 'none';
+    document.getElementById('edit-username').value = '';
+    document.getElementById('edit-password').value = '';
+}
+
+async function updateUser() {
+    const username = document.getElementById('edit-username').value.trim();
+    const password = document.getElementById('edit-password').value;
+    
+    if (!username && !password) {
+        showToast('Preencha ao menos um campo', 'error');
+        return;
+    }
+    
+    try {
+        const body = {};
+        if (username) body.username = username;
+        if (password) body.password = password;
+        
+        const res = await fetch(`/users/${editingUserId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('Usuario atualizado!', 'success');
+            cancelEdit();
+            loadUsers();
+        } else {
+            showToast(data.error || 'Erro ao atualizar', 'error');
+        }
+    } catch (err) {
+        showToast('Erro de conexao', 'error');
     }
 }
 
 async function deleteUser(id) {
-    if(!confirm('Tem certeza que deseja deletar este usuário?')) return;
+    if (!confirm(`Deletar usuario #${id}?`)) return;
     try {
         const res = await fetch(`/users/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            showToast('Usuário deletado', 'success');
+            showToast(`Usuario #${id} deletado`, 'success');
             loadUsers();
+            updateStats();
         } else {
-            showToast('Erro ao deletar', 'error');
+            const data = await res.json();
+            showToast(data.error || 'Erro ao deletar', 'error');
         }
     } catch (err) {
-        showToast('Erro de conexão', 'error');
+        showToast('Erro de conexao', 'error');
     }
 }
 
-// Incidents
+// ==================== INCIDENTS ====================
+
 async function triggerIncident(type) {
     showToast(`Disparando incidente: ${type}...`, 'info');
     try {
         const res = await fetch(`/incidente-${type}`);
         const data = await res.json();
-        
         if (res.ok) {
-            showToast(data.message || 'Incidente executado.', 'warning');
+            showToast(data.message || 'Incidente executado', 'warning');
         } else {
-            showToast(data.error || 'Incidente gerou erro (esperado).', 'error');
+            showToast(data.error || 'Incidente gerou erro (esperado)', 'error');
         }
     } catch (err) {
-        showToast('O servidor demorou ou falhou (Incidente com sucesso!)', 'error');
+        showToast('Servidor demorou ou falhou (incidente OK)', 'error');
+    }
+    updateStats();
+}
+
+// ==================== BRUTE FORCE SIMULATION ====================
+
+async function simulateBruteForce() {
+    const logBox = document.getElementById('bruteforce-log');
+    logBox.innerHTML = '<p>Iniciando simulacao de ataque...</p>';
+    
+    // Register test user first
+    await fetch('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'hacker_target', password: 'realpass' })
+    });
+    
+    for (let i = 1; i <= 12; i++) {
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'hacker_target', password: 'wrong' + i })
+        });
+        const status = res.status;
+        const color = status === 429 ? 'var(--danger)' : status === 401 ? 'var(--warning)' : 'var(--text-secondary)';
+        logBox.innerHTML += `<p style="color:${color}">Tentativa ${i}: HTTP ${status} ${status === 429 ? 'BLOQUEADO' : status === 401 ? 'Falha' : ''}</p>`;
+    }
+    
+    logBox.innerHTML += '<p style="color:var(--success);margin-top:0.5rem">Ataque bloqueado pelo rate limit! Veja as metricas no Grafana.</p>';
+    updateStats();
+}
+
+// ==================== STATS ====================
+
+async function updateStats() {
+    try {
+        const res = await fetch('/metrics');
+        const text = await res.text();
+        
+        // Parse Prometheus text format
+        const getVal = (name, label) => {
+            const regex = label 
+                ? new RegExp(`${name}{${label}}[\\s"]+([0-9.e+]+)`)
+                : new RegExp(`${name}\\s+([0-9.e+]+)`);
+            const match = text.match(regex);
+            return match ? parseFloat(match[1]) || 0 : 0;
+        };
+        
+        document.getElementById('stat-registrations').innerText = getVal('app_registrations_total');
+        document.getElementById('stat-logins-ok').innerText = getVal('app_logins_total', 'status="success"');
+        document.getElementById('stat-logins-fail').innerText = getVal('app_logins_total', 'status="failure"');
+        
+        // Sum all error types
+        const errorMatch = text.match(/app_errors_total\{[^}]*\}\s+([0-9.e+]+)/g);
+        let totalErrors = 0;
+        if (errorMatch) {
+            errorMatch.forEach(m => {
+                const v = m.match(/\s+([0-9.e+]+)$/);
+                if (v) totalErrors += parseFloat(v[1]) || 0;
+            });
+        }
+        document.getElementById('stat-errors').innerText = totalErrors;
+    } catch (e) {
+        // Silently fail - stats are cosmetic
     }
 }
 
-// UI Helpers
+async function checkHealth() {
+    try {
+        const res = await fetch('/health');
+        if (res.ok) {
+            document.getElementById('status-health').innerHTML = '<span class="status-dot green"></span> API Online';
+        }
+    } catch (e) {
+        document.getElementById('status-health').innerHTML = '<span class="status-dot red"></span> API Offline';
+    }
+}
+
+// Refresh stats every 10 seconds
+setInterval(() => {
+    if (currentUser) {
+        updateStats();
+        checkHealth();
+    }
+}, 10000);
+
+// ==================== HELPERS ====================
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerText = message;
     toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
+    setTimeout(() => toast.remove(), 3000);
 }

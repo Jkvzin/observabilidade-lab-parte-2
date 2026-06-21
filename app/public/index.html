@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observability Lab Dashboard</title>
+    <title>Observabilidade Lab 2</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -16,17 +16,16 @@
     <!-- LOGIN VIEW -->
     <main id="login-view" class="view active">
         <div class="glass-panel login-card">
-            <h1>Bem-vindo</h1>
-            <p>Laboratório de Observabilidade SRE</p>
+            <h1>O11y<span>Lab 2</span></h1>
+            <p>Observabilidade e Seguranca</p>
             <div class="tabs">
                 <button class="tab-btn active" id="tab-login">Login</button>
                 <button class="tab-btn" id="tab-register">Registro</button>
             </div>
-            
             <form id="auth-form">
                 <div class="input-group">
-                    <label for="username">Usuário</label>
-                    <input type="text" id="username" placeholder="Digite seu usuário" required>
+                    <label for="username">Usuario</label>
+                    <input type="text" id="username" placeholder="Digite seu usuario" required>
                 </div>
                 <div class="input-group">
                     <label for="password">Senha</label>
@@ -41,69 +40,138 @@
     <!-- DASHBOARD VIEW -->
     <main id="dashboard-view" class="view">
         <nav class="glass-navbar">
-            <div class="logo">O11y<span>Lab</span></div>
+            <div class="logo">O11y<span>Lab 2</span></div>
+            <div class="nav-links">
+                <a href="http://localhost:3000" target="_blank" class="nav-link">Grafana</a>
+                <a href="http://localhost:9090" target="_blank" class="nav-link">Prometheus</a>
+                <a href="/metrics" target="_blank" class="nav-link">Metricas</a>
+                <a href="/health" target="_blank" class="nav-link">Health</a>
+            </div>
             <div class="nav-user">
                 <span id="current-user-display">User</span>
                 <button id="logout-btn" class="btn-secondary">Sair</button>
             </div>
         </nav>
 
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-item" id="status-health">
+                <span class="status-dot green"></span> API Online
+            </div>
+            <div class="status-item">
+                Usuarios: <strong id="stat-users">0</strong>
+            </div>
+            <div class="status-item">
+                Registros: <strong id="stat-registrations">0</strong>
+            </div>
+            <div class="status-item">
+                Logins OK: <strong id="stat-logins-ok">0</strong>
+            </div>
+            <div class="status-item">
+                Falhas: <strong id="stat-logins-fail">0</strong>
+            </div>
+            <div class="status-item">
+                Erros: <strong id="stat-errors">0</strong>
+            </div>
+        </div>
+
         <div class="dashboard-grid">
-            <!-- CRUD Section -->
+            <!-- CRUD Panel -->
             <section class="glass-panel crud-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h2>Gerenciamento de Usuários</h2>
-                    <button class="btn-secondary" onclick="loadUsers()" style="padding: 0.5rem 1rem; font-size: 0.9rem;">🔄 Recarregar Lista</button>
+                <h2>Gerenciamento de Usuarios</h2>
+
+                <!-- Create User Form -->
+                <div class="create-user-form">
+                    <h3>Novo Usuario</h3>
+                    <div class="form-row">
+                        <input type="text" id="new-username" placeholder="Username" class="input-sm">
+                        <input type="password" id="new-password" placeholder="Senha" class="input-sm">
+                        <button onclick="createUser()" class="btn-success">Criar</button>
+                    </div>
+                    <div id="create-message" class="message-sm"></div>
                 </div>
+
+                <!-- Edit User Form (hidden by default) -->
+                <div class="create-user-form" id="edit-form" style="display:none">
+                    <h3>Editar Usuario <span id="edit-user-id"></span></h3>
+                    <div class="form-row">
+                        <input type="text" id="edit-username" placeholder="Novo username" class="input-sm">
+                        <input type="password" id="edit-password" placeholder="Nova senha" class="input-sm">
+                        <button onclick="updateUser()" class="btn-warning">Salvar</button>
+                        <button onclick="cancelEdit()" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
                 <div class="table-container">
                     <table id="users-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Usuário</th>
-                                <th>Ações</th>
+                                <th>Usuario</th>
+                                <th>Criado em</th>
+                                <th>Acoes</th>
                             </tr>
                         </thead>
-                        <tbody id="users-list">
-                            <!-- Users will be injected here -->
-                        </tbody>
+                        <tbody id="users-list"></tbody>
                     </table>
                 </div>
+                <button class="btn-secondary" onclick="loadUsers()" style="margin-top:1rem">Atualizar Lista</button>
             </section>
 
-            <!-- Incidents Section -->
-            <section class="glass-panel incidents-section">
-                <h2>Painel de Controle de Incidentes</h2>
-                <p>Dispare simulações para testar o Grafana e Prometheus.</p>
-                
-                <div class="incident-cards">
-                    <div class="incident-card error">
-                        <div class="icon">🔥</div>
-                        <h3>Erro Crítico (500)</h3>
-                        <p>Gera taxa de erro HTTP 500 imediata.</p>
-                        <button onclick="triggerIncident('erro')" class="btn-danger">Disparar Erro</button>
+            <!-- Right Column -->
+            <div class="right-column">
+                <!-- Incidents Panel -->
+                <section class="glass-panel incidents-section">
+                    <h2>Painel de Incidentes</h2>
+                    <p>Dispare simulacoes para testar monitoramento.</p>
+                    <div class="incident-cards">
+                        <div class="incident-card error">
+                            <div class="icon">500</div>
+                            <h3>Erro Critico</h3>
+                            <p>Forca erro HTTP 500</p>
+                            <button onclick="triggerIncident('erro')" class="btn-danger">Disparar</button>
+                        </div>
+                        <div class="incident-card cpu">
+                            <div class="icon">CPU</div>
+                            <h3>Sobrecarga CPU</h3>
+                            <p>Estressa todos os nucleos</p>
+                            <button onclick="triggerIncident('cpu')" class="btn-warning">Disparar</button>
+                        </div>
+                        <div class="incident-card delay">
+                            <div class="icon">10s</div>
+                            <h3>Delay</h3>
+                            <p>Resposta em 10 segundos</p>
+                            <button onclick="triggerIncident('delay')" class="btn-info">Disparar</button>
+                        </div>
                     </div>
+                </section>
 
-                    <div class="incident-card cpu">
-                        <div class="icon">⚡</div>
-                        <h3>Sobrecarga de CPU</h3>
-                        <p>Bloqueia o event loop do Node por 5s.</p>
-                        <button onclick="triggerIncident('cpu')" class="btn-warning">Gerar Pico CPU</button>
-                    </div>
+                <!-- Brute Force Test -->
+                <section class="glass-panel incidents-section">
+                    <h2>Teste de Seguranca</h2>
+                    <p>Simule um ataque de forca bruta (12 tentativas).</p>
+                    <button onclick="simulateBruteForce()" class="btn-danger" style="width:100%">
+                        Simular Ataque Brute Force
+                    </button>
+                    <div id="bruteforce-log" class="log-box"></div>
+                </section>
 
-                    <div class="incident-card delay">
-                        <div class="icon">⏳</div>
-                        <h3>Instabilidade (Delay)</h3>
-                        <p>Demora 10 segundos para responder.</p>
-                        <button onclick="triggerIncident('delay')" class="btn-info">Testar Timeout</button>
+                <!-- Attack Detection Info -->
+                <section class="glass-panel incidents-section">
+                    <h2>Deteccao de Ataques</h2>
+                    <div class="detection-info">
+                        <p>Rate limit login: <strong>10 tentativas / 15 min</strong></p>
+                        <p>Rate limit geral: <strong>100 req / 15 min</strong></p>
+                        <p>Senhas: <strong>bcrypt (nunca plain text)</strong></p>
+                        <p>Headers: <strong>helmet (XSS, CSP, HSTS)</strong></p>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
     </main>
 
     <div id="toast-container"></div>
-
     <script src="script.js"></script>
 </body>
 </html>
