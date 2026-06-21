@@ -68,4 +68,30 @@ O Dashboard do Grafana foi configurado para monitorar 3 frentes principais:
 - **Tráfego e Latência**: Histograma de tempo de resposta HTTP e Correlação visual (Dual Y-Axis) entre Picos de Falha e Uso de CPU.
 
 ---
+
+## 🚨 Alertas Configurados (Grafana)
+
+As regras de alerta são provisionadas automaticamente via `grafana/provisioning/alerting/rules.yml`. Ao subir o ambiente com `docker compose up -d --build`, os seguintes alertas já estarão ativos:
+
+| Alerta | Condição | Severidade |
+|---|---|---|
+| Alta utilização de CPU | `rate(cpu)[5m] > 80%` | ⚠️ warning |
+| Alta taxa de erro HTTP 5xx | Erros 5xx > 10% das requisições | 🔴 critical |
+| Latência P95 elevada | P95 > 2 segundos | ⚠️ warning |
+| Serviço DOWN | `up{job="node-app"} == 0` | 🔴 critical |
+| Memória alta | Uso > 85% | ⚠️ warning |
+
+### Configurando notificações (Slack, Email, Telegram)
+
+1. Acesse o Grafana em `http://localhost:3000` → **Alerting** → **Contact points**
+2. Edite o contact point "Default" (ou crie um novo)
+3. Escolha o tipo de notificação desejado e preencha as credenciais:
+   - **Email**: requer SMTP configurado no `grafana.ini` (ou variáveis `GF_SMTP_*`)
+   - **Slack**: requer um Webhook URL
+   - **Telegram**: requer Bot Token + Chat ID
+4. Clique em **Save** e depois em **Test** para validar
+
+As regras de alerta estão provisionadas como arquivo; para modificá-las, edite `grafana/provisioning/alerting/rules.yml` e reinicie o Grafana.
+
+---
 *Desenvolvido para fins de estudo e aprimoramento em práticas de SRE e DevOps.*

@@ -1,0 +1,214 @@
+# Regras de alerta do Grafana (Unified Alerting)
+# Documentação: https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: "Observabilidade"
+    folder: "Observabilidade"
+    interval: 60s
+    rules:
+      # ── 1. Alta utilização de CPU ──
+      - uid: alert-cpu-alta
+        title: "Alta utilização de CPU"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'rate(node_app_process_cpu_seconds_total[5m]) * 100'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: classic_conditions
+              conditions:
+                - type: query
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  evaluator:
+                    type: gt
+                    params: [80]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "CPU usage acima de 80% por 5 minutos"
+        labels:
+          severity: warning
+        isPaused: false
+
+      # ── 2. Alta taxa de erro HTTP 5xx ──
+      - uid: alert-taxa-erro
+        title: "Alta taxa de erro HTTP 5xx"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: classic_conditions
+              conditions:
+                - type: query
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  evaluator:
+                    type: gt
+                    params: [10]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Taxa de erro HTTP 5xx acima de 10%"
+        labels:
+          severity: critical
+        isPaused: false
+
+      # ── 3. Latência P95 elevada ──
+      - uid: alert-latencia
+        title: "Latência P95 elevada"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: classic_conditions
+              conditions:
+                - type: query
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  evaluator:
+                    type: gt
+                    params: [2]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Latência P95 acima de 2 segundos"
+        labels:
+          severity: warning
+        isPaused: false
+
+      # ── 4. Serviço fora do ar ──
+      - uid: alert-servico-down
+        title: "Aplicação está DOWN"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 'up{job="node-app"}'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: classic_conditions
+              conditions:
+                - type: query
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  evaluator:
+                    type: lt
+                    params: [1]
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Aplicação está DOWN — up == 0"
+        labels:
+          severity: critical
+        isPaused: false
+
+      # ── 5. Memória alta ──
+      - uid: alert-memoria
+        title: "Uso de memória acima de 85%"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: '100 * (1 - (node_memory_MemFree_bytes / node_memory_MemTotal_bytes))'
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: B
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: classic_conditions
+              conditions:
+                - type: query
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  evaluator:
+                    type: gt
+                    params: [85]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Uso de memória acima de 85%"
+        labels:
+          severity: warning
+        isPaused: false
