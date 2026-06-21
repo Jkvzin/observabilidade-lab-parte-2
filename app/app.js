@@ -148,6 +148,11 @@ app.get('/incidente-delay', (req, res) => {
     }, 10000);
 });
 
+// Health check para Render e monitoramento
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Inicialização
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

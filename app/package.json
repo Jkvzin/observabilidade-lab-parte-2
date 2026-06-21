@@ -4,7 +4,12 @@
   "description": "API Node.js para lab de observabilidade",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "echo \"No tests configured yet\" && exit 0",
+    "test:coverage": "echo \"No tests configured yet\" && exit 0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "express": "^4.21.2",
