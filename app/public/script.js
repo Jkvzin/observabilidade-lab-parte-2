@@ -264,7 +264,7 @@ async function simulateBruteForce() {
         body: JSON.stringify({ username: 'hacker_target', password: 'realpass' })
     });
     
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= 8; i++) {
         const res = await fetch('/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

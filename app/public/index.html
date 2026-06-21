@@ -36,7 +36,7 @@
             <div id="auth-message" class="message"></div>
             <div class="login-info">
                 <p>Sessao salva por 30 min (sobrevive ao F5)</p>
-                <p>Limite: 10 tentativas de login a cada 15 min</p>
+                <p>Limite: 5 tentativas de login a cada 30 segundos</p>
             </div>
         </div>
     </main>
@@ -154,7 +154,7 @@
                 <!-- Brute Force Test -->
                 <section class="glass-panel incidents-section">
                     <h2>Teste de Seguranca</h2>
-                    <p>Simule um ataque de forca bruta (12 tentativas).</p>
+                    <p>Simule um ataque (8 tentativas, bloqueio em 30s).</p>
                     <button onclick="simulateBruteForce()" class="btn-danger" style="width:100%">
                         Simular Ataque Brute Force
                     </button>
@@ -165,8 +165,8 @@
                 <section class="glass-panel incidents-section">
                     <h2>Deteccao de Ataques</h2>
                     <div class="detection-info">
-                        <p>Rate limit login: <strong>10 tentativas / 15 min</strong></p>
-                        <p>Rate limit geral: <strong>100 req / 15 min</strong></p>
+                        <p>Rate limit login: <strong>5 tentativas / 30 segundos</strong></p>
+                        <p>Rate limit geral: <strong>100 req / 30 segundos</strong></p>
                         <p>Senhas: <strong>bcrypt (nunca plain text)</strong></p>
                         <p>Headers: <strong>helmet (XSS, CSP, HSTS)</strong></p>
                     </div>

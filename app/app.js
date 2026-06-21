@@ -102,7 +102,7 @@ app.use((req, res, next) => {
 
 // Rate limiting
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
+    windowMs: 30 * 1000, // 30 segundos (para demonstracao)
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
@@ -111,11 +111,11 @@ const generalLimiter = rateLimit({
 app.use(generalLimiter);
 
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10, // 10 tentativas por 15 min
+    windowMs: 30 * 1000, // 30 segundos (para demonstracao)
+    max: 5, // 5 tentativas em 30s
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: 'Muitas tentativas de login, tente novamente mais tarde' }
+    message: { error: 'Muitas tentativas de login, tente novamente em 30 segundos' }
 });
 
 // Rota de métricas pro Prometheus
