@@ -1,11 +1,15 @@
 const express = require('express');
 const promClient = require('prom-client');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const { Worker } = require('worker_threads');
 const os = require('os');
 
 const app = express();
 app.use(express.json());
+app.use(helmet());
 app.set('json spaces', 2);
 
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
@@ -42,6 +46,25 @@ app.use((req, res, next) => {
     next();
 });
 
+// Rate limiting
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas requisições, tente novamente mais tarde' }
+});
+app.use(generalLimiter);
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10, // 10 tentativas por 15 min
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas tentativas de login, tente novamente mais tarde' }
+});
+
+// Rota de métricas pro Prometheus
 app.get('/metrics', async (req, res) => {
     res.set('Content-Type', promClient.register.contentType);
     res.end(await promClient.register.metrics());
@@ -62,31 +85,62 @@ app.get('/health', (req, res) => {
 
 const users = [];
 let currentId = 1;
+const SALT_ROUNDS = 10;
 
-app.post('/register', (req, res) => {
+// Validação de entrada
+function validateUsername(username) {
+    if (!username || typeof username !== 'string') return false;
+    if (username.length < 3 || username.length > 30) return false;
+    return /^[a-zA-Z0-9_]+$/.test(username);
+}
+
+function validatePassword(password) {
+    return password && typeof password === 'string' && password.length >= 6;
+}
+
+// Rotas CRUD e Login
+app.post('/register', async (req, res) => {
     const { username, password } = req.body;
-    if (!username || !password) {
-        console.error('[Erro] Falha ao registrar: dados incompletos');
-        return res.status(400).json({ error: 'Dados incompletos' });
+    if (!validateUsername(username)) {
+        return res.status(400).json({ error: 'Username inválido. Use 3-30 caracteres alfanuméricos.' });
     }
-    const user = { id: currentId++, username, password };
-    users.push(user);
-    console.log(`[INFO] Usuário registrado: ${username}`);
-    res.status(201).json({ id: user.id, username });
+    if (!validatePassword(password)) {
+        return res.status(400).json({ error: 'Senha inválida. Minimo de 6 caracteres.' });
+    }
+    try {
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+        const user = { id: currentId++, username, password: hashedPassword };
+        users.push(user);
+        console.log(`[INFO] Usuário registrado: ${username}`);
+        res.status(201).json({ id: user.id, username });
+    } catch (err) {
+        console.error('[Erro] Falha ao gerar hash da senha:', err.message);
+        res.status(500).json({ error: 'Erro interno ao registrar usuário' });
+    }
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
         return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
     }
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-        console.log(`[INFO] Login efetuado: ${username}`);
-        res.status(200).json({ message: 'Login efetuado com sucesso' });
-    } else {
-        console.error(`[Erro] Login falhou: ${username}`);
-        res.status(401).json({ error: 'Credenciais inválidas' });
+    const user = users.find(u => u.username === username);
+    if (!user) {
+        console.error(`[Erro] Login falhou: ${username} (usuário não encontrado)`);
+        return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+    try {
+        const valid = await bcrypt.compare(password, user.password);
+        if (valid) {
+            console.log(`[INFO] Login efetuado: ${username}`);
+            res.status(200).json({ message: 'Login efetuado com sucesso' });
+        } else {
+            console.error(`[Erro] Login falhou: ${username} (senha incorreta)`);
+            res.status(401).json({ error: 'Credenciais inválidas' });
+        }
+    } catch (err) {
+        console.error('[Erro] Falha ao verificar senha:', err.message);
+        res.status(500).json({ error: 'Erro interno ao processar login' });
     }
 });
 
