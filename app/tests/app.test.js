@@ -214,6 +214,13 @@ describe('API de Observabilidade', () => {
             expect(res.text).toContain('http_requests_total');
             expect(res.text).toContain('http_request_duration_seconds');
             expect(res.text).toContain('node_app_');
+            // Métricas de negócio
+            expect(res.text).toContain('app_registrations_total');
+            expect(res.text).toContain('app_logins_total');
+            expect(res.text).toContain('app_crud_operations_total');
+            expect(res.text).toContain('app_errors_total');
+            expect(res.text).toContain('app_active_users');
+            expect(res.text).toContain('app_health_status');
         });
     });
 });
