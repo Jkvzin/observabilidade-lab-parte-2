@@ -1,71 +1,91 @@
-# 🚀 Laboratório de Observabilidade Completo (O11yLab)
-Dupla: João Guilherme e João Victor
+# Observabilidade Lab 2
 
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=Prometheus&logoColor=white)
-![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
+Laboratorio pratico de **Engenharia de Confiabilidade (SRE) e Observabilidade** com stack completa: Node.js, Prometheus, Grafana, Loki e Docker.
 
-Um laboratório prático de **Engenharia de Confiabilidade (SRE) e Observabilidade**, construído para demonstrar a coleta, visualização e análise de métricas e logs em tempo real.
-
-O projeto inclui uma API RESTful completa com interface Web (Dashboard) que permite a **simulação de incidentes** (Picos de CPU, Gargalos de Rede e Erros Críticos) para que você possa observar o comportamento de um sistema em colapso nos gráficos do Grafana.
+**Dupla:** Joao Guilherme e Joao Victor
 
 ---
 
-## 🛠️ Tecnologias e Arquitetura
+## Stack
 
-Este laboratório utiliza a stack padrão da indústria para observabilidade:
-
-- **Node.js + Express**: Aplicação alvo (API) instrumentada nativamente.
-- **Prometheus**: Coleta de métricas (Time-Series Database).
-- **Node Exporter**: Coleta de métricas da infraestrutura da máquina host.
-- **Loki & Promtail**: Coleta e agregação de Logs da aplicação.
-- **Grafana**: Plataforma de visualização e Dashboards dinâmicos.
-- **Docker Compose**: Orquestração de todos os serviços.
+| Componente | Tecnologia | Porta |
+|-----------|-----------|-------|
+| API | Node.js + Express | 3001 |
+| Metricas | Prometheus | 9090 |
+| Dashboards | Grafana | 3000 |
+| Logs | Loki + Promtail | 3100 |
+| Infra | Node Exporter | 9100 |
 
 ---
 
-## ⚙️ Como Executar o Laboratório
+## Como Rodar
 
-Você precisa ter o **Docker** e o **Docker Compose** instalados na sua máquina.
-
-1. Clone este repositório:
 ```bash
-git clone https://github.com/Jkvzin/observabilidade-lab.git
-cd observabilidade-lab
-```
-
-2. Suba a infraestrutura completa:
-```bash
+git clone https://github.com/Jkvzin/observabilidade-lab-parte-2.git
+cd observabilidade-lab-parte-2
 docker compose up -d --build
 ```
 
-3. Acesse os serviços nos seus respectivos links:
-- **Dashboard Web / API**: [http://localhost:3001](http://localhost:3001)
-- **Grafana**: [http://localhost:3000](http://localhost:3000) *(Login: admin / admin)*
-- **Prometheus**: [http://localhost:9090](http://localhost:9090)
+**Acessar:**
+- Dashboard Web: http://localhost:3001
+- Grafana: http://localhost:3000 (admin / admin)
+- Prometheus: http://localhost:9090
 
-*(Nota: Na pasta `dashboards`, há um arquivo JSON do Grafana pronto para ser importado com todos os gráficos do lab).*
-
----
-
-## 💥 Simulando Incidentes (Chaos Engineering)
-
-Acesse a interface web em `http://localhost:3001` para interagir com o sistema. Do lado direito, você verá o "Painel de Controle de Incidentes":
-
-1. **Erro Crítico (500)**: Força a API a disparar erros internos. Acompanhe a agulha de *Taxa de Erro (%)* no Grafana subir para 100%.
-2. **Sobrecarga de CPU**: Utiliza `worker_threads` para estressar **todos os núcleos** do seu processador por 5 segundos. O gráfico de Uso de CPU registrará picos altíssimos.
-3. **Instabilidade (Delay)**: Segura as requisições ativas por 10 segundos antes de responder. Comprova visualmente o engarrafamento de rede no gráfico de *Latência*.
+Importe o dashboard em `dashboards/dashboard.json` no Grafana para ver os graficos.
 
 ---
 
-## 📈 Gráficos Implementados
+## Endpoints da API
 
-O Dashboard do Grafana foi configurado para monitorar 3 frentes principais:
+| Metodo | Rota | Descricao |
+|--------|------|-----------|
+| GET | `/` | Boas-vindas |
+| GET | `/health` | Health check (status, uptime) |
+| POST | `/register` | Criar usuario |
+| POST | `/login` | Login (bcrypt + rate limit) |
+| GET | `/users` | Listar usuarios |
+| GET | `/users/:id` | Buscar por ID |
+| PUT | `/users/:id` | Atualizar usuario |
+| DELETE | `/users/:id` | Deletar usuario |
+| GET | `/metrics` | Metricas Prometheus |
+| GET | `/incidente-erro` | Simular erro 500 |
+| GET | `/incidente-cpu` | Simular pico de CPU |
+| GET | `/incidente-delay` | Simular delay 10s |
 
-- **Infraestrutura**: Uso de CPU por processo, Uso de Memória em % e Tráfego de Rede (I/O).
-- **Aplicação (Logs)**: Volume de Logs em barras, Logs agregados em tempo real e Taxa de Erros em ponteiro (Gauge).
-- **Tráfego e Latência**: Histograma de tempo de resposta HTTP e Correlação visual (Dual Y-Axis) entre Picos de Falha e Uso de CPU.
+## Metricas Expostas
+
+- `http_requests_total` — Requisicoes HTTP por metodo, rota e status
+- `http_request_duration_seconds` — Latencia (histograma P50/P95/P99)
+- `app_registrations_total` — Registros de usuarios
+- `app_logins_total{status}` — Logins (success/failure)
+- `app_crud_operations_total{operation,status}` — Operacoes CRUD
+- `app_errors_total{type,endpoint}` — Erros por tipo
+- `app_active_users` — Usuarios cadastrados
+- `app_health_status` — UP/DOWN
+
+## Seguranca
+
+- Senhas com bcrypt (SALT_ROUNDS=10)
+- Rate limiting (100 req/15min geral, 10 req/15min login)
+- Headers HTTP com helmet
+- Validacao de input (username 3-30 chars, senha 6+)
+
+## CI/CD
+
+Pipeline GitHub Actions em `.github/workflows/ci.yml`:
+- Testes automatizados (23 testes)
+- Build Docker
+- Deploy via Render Deploy Hook
+
+---
+
+## ☁️ Deploy no Render
+
+O Render é uma plataforma cloud que oferece deploy automático a partir de repositórios GitHub. Siga os passos abaixo para publicar a API.
+
+### Pré-requisitos
+- Conta no [Render](https://render.com) (login com GitHub recomendado)
+- Repositório conectado ao GitHub
 
 ---
 
@@ -93,5 +113,84 @@ As regras de alerta são provisionadas automaticamente via `grafana/provisioning
 
 As regras de alerta estão provisionadas como arquivo; para modificá-las, edite `grafana/provisioning/alerting/rules.yml` e reinicie o Grafana.
 
----
-*Desenvolvido para fins de estudo e aprimoramento em práticas de SRE e DevOps.*
+### Passo a passo
+
+1. **Crie uma conta no Render**  
+   Acesse [render.com](https://render.com) e faça login com sua conta do GitHub.
+
+2. **Crie um novo Web Service**  
+   No dashboard, clique em **New +** → **Web Service** e selecione o repositório `Jkvzin/observabilidade-lab-parte-2`.
+
+3. **Configure o serviço:**
+   | Campo | Valor |
+   |---|---|
+   | **Name** | `observabilidade-api` |
+   | **Root Directory** | `app` |
+   | **Runtime** | Node |
+   | **Build Command** | `npm install` |
+   | **Start Command** | `npm start` |
+   | **Health Check Path** | `/health` |
+
+4. **Variáveis de ambiente** (opcional):  
+   A aplicação já usa `PORT` dinâmico via `process.env.PORT || 3001`, então não é necessário configurar nada adicional.
+
+5. **Clique em "Create Web Service"**  
+   O Render fará o build automaticamente e disponibilizará a API em uma URL pública (ex: `https://observabilidade-api.onrender.com`).
+
+### Deploy Hook (GitHub Actions)
+
+Para integrar o deploy automático com GitHub Actions, configure a action `render-deploy` no seu workflow:
+
+```yaml
+- name: Trigger Render Deploy
+  run: |
+    curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+```
+
+> O **Deploy Hook URL** pode ser encontrado nas configurações do Web Service no Render, na seção **Settings → Deploy Hook**.
+
+O Render também oferece deploy automático em cada push na branch principal — não é obrigatório configurar a action se preferir o auto-deploy nativo.
+
+## Testes
+
+```bash
+cd app
+npm install
+npm test        # 23 testes
+npm run test:coverage
+```
+
+## Simulando Incidentes
+
+Acesse a Dashboard Web em http://localhost:3001 e use o painel de controle para disparar:
+- Erro Critico (500) — afeta taxa de erro no Grafana
+- Sobrecarga de CPU — pico nos graficos de CPU
+- Instabilidade (Delay) — latencia elevada
+
+Ou via terminal:
+```bash
+# Simular brute force (detectado e bloqueado)
+for i in $(seq 1 12); do
+  curl -s -X POST http://localhost:3001/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"admin","password":"errada"}'
+done
+# 10x 401, depois 429 (bloqueado pelo rate limit)
+```
+
+## Estrutura do Projeto
+
+```
+.
+├── app/                   # Aplicacao Node.js
+│   ├── app.js             # Servidor Express
+│   ├── tests/             # Testes automatizados
+│   └── public/            # Dashboard web
+├── prometheus/            # Config de scraping
+├── promtail/              # Coleta de logs
+├── loki/                  # Armazenamento de logs
+├── dashboards/            # Dashboard Grafana JSON
+├── ansible/               # Playbook de deploy
+├── .github/workflows/     # CI/CD pipeline
+└── docker-compose.yml     # Orquestracao
+```
