@@ -7,7 +7,6 @@ const os = require('os');
 const app = express();
 app.use(express.json());
 app.set('json spaces', 2);
-app.use(express.static(path.join(__dirname, 'public')));
 
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics({ prefix: 'node_app_' });
@@ -166,6 +165,9 @@ app.get('/incidente-delay', (req, res) => {
         res.status(200).json({ message: 'Resposta com delay de 10 segundos' });
     }, 10000);
 });
+
+// Arquivos estaticos (deve vir depois das rotas da API)
+app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3001;
 if (require.main === module) {
