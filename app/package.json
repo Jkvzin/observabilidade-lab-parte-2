@@ -1,0 +1,13 @@
+{
+  "name": "observabilidade-api",
+  "version": "1.0.0",
+  "description": "API Node.js para lab de observabilidade",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "prom-client": "^15.1.3"
+  }
+}

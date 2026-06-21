@@ -1,0 +1,42 @@
+---
+- name: Deploy Observability Lab
+  hosts: local
+  become: yes
+  tasks:
+    - name: Install dependencies (Debian/Ubuntu)
+      apt:
+        name:
+          - docker.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Run docker compose up
+      command: docker compose up -d --build
+      args:
+        chdir: /home/joaovictor/observabilidade-laboratorio/observabilidade-lab
+
+    - name: Wait for services to be ready
+      pause:
+        seconds: 15
+
+    - name: Validate Grafana is running (HTTP 200)
+      uri:
+        url: http://localhost:3000/login
+        status_code: 200
+
+    - name: Validate Node API is running (HTTP 200)
+      uri:
+        url: http://localhost:3001/users
+        status_code: 200
+
+    - name: Print validation results
+      debug:
+        msg: "Grafana e API estão no ar com sucesso!"
