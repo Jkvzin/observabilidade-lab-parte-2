@@ -1,28 +1,7 @@
-# Dependências
 node_modules/
-
-# Variáveis de ambiente
 .env
-.env.*
-!.env.example
-
-# Logs
 *.log
-npm-debug.log*
-
-# Sistema operacional
 .DS_Store
-Thumbs.db
-
-# Cobertura de testes
 coverage/
-
-# Build
 dist/
-build/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+contexto.md
