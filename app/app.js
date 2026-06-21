@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { Worker } = require('worker_threads');
 const os = require('os');
+const logger = require('./logger');
 
 const app = express();
 app.use(express.json());
@@ -62,10 +63,12 @@ const healthStatusGauge = new promClient.Gauge({
     help: 'Status de saúde da aplicação (1=UP, 0=DOWN)'
 });
 
+// Middleware de métricas + logging estruturado
 app.use((req, res, next) => {
     const startEpoch = Date.now();
     res.on('finish', () => {
-        const responseTimeInSeconds = (Date.now() - startEpoch) / 1000;
+        const durationMs = Date.now() - startEpoch;
+        const responseTimeInSeconds = durationMs / 1000;
         httpRequestsTotal.inc({
             method: req.method,
             route: req.path,
@@ -76,6 +79,23 @@ app.use((req, res, next) => {
             route: req.path,
             status_code: res.statusCode
         }, responseTimeInSeconds);
+
+        // Log estruturado da requisição HTTP (sugestão do review: ip + userAgent)
+        const logCtx = {
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            duration: durationMs,
+            ip: req.ip || req.socket.remoteAddress,
+            userAgent: req.get('user-agent') || 'unknown'
+        };
+        if (res.statusCode >= 500) {
+            logger.error('Requisição com erro interno', logCtx);
+        } else if (res.statusCode >= 400) {
+            logger.warn('Requisição com erro do cliente', logCtx);
+        } else {
+            logger.info('Requisição concluída', logCtx);
+        }
     });
     next();
 });
@@ -106,6 +126,7 @@ app.get('/metrics', async (req, res) => {
 
 // GET / — Redireciona para o dashboard web
 app.get('/', (req, res) => {
+    logger.info('Rota raiz acessada — redirecionando para dashboard', { path: '/' });
     res.redirect('/index.html');
 });
 
@@ -148,10 +169,10 @@ app.post('/register', async (req, res) => {
         users.push(user);
         registrationsTotal.inc();
         activeUsersGauge.inc();
-        console.log(`[INFO] Usuário registrado: ${username}`);
+        logger.info('Usuário registrado', { username, userId: user.id });
         res.status(201).json({ id: user.id, username });
     } catch (err) {
-        console.error('[Erro] Falha ao gerar hash da senha:', err.message);
+        logger.error('Falha ao gerar hash da senha', { error: err.message });
         res.status(500).json({ error: 'Erro interno ao registrar usuário' });
     }
 });
@@ -164,29 +185,29 @@ app.post('/login', loginLimiter, async (req, res) => {
     const user = users.find(u => u.username === username);
     if (!user) {
         loginsTotal.inc({ status: 'failure' });
-        console.error(`[Erro] Login falhou: ${username} (usuário não encontrado)`);
+        logger.warn('Login falhou', { username, reason: 'usuario_nao_encontrado' });
         return res.status(401).json({ error: 'Credenciais inválidas' });
     }
     try {
         const valid = await bcrypt.compare(password, user.password);
         if (valid) {
             loginsTotal.inc({ status: 'success' });
-            console.log(`[INFO] Login efetuado: ${username}`);
+            logger.info('Login efetuado', { username, userId: user.id });
             res.status(200).json({ message: 'Login efetuado com sucesso' });
         } else {
             loginsTotal.inc({ status: 'failure' });
-            console.error(`[Erro] Login falhou: ${username} (senha incorreta)`);
+            logger.warn('Login falhou', { username, reason: 'senha_incorreta' });
             res.status(401).json({ error: 'Credenciais inválidas' });
         }
     } catch (err) {
-        console.error('[Erro] Falha ao verificar senha:', err.message);
+        logger.error('Falha ao verificar senha', { error: err.message });
         res.status(500).json({ error: 'Erro interno ao processar login' });
     }
 });
 
 app.get('/users', (req, res) => {
     crudOperationsTotal.inc({ operation: 'read', status: 'success' });
-    console.log('[INFO] Listando usuários');
+    logger.info('Listando usuários', { count: users.length });
     res.json(users.map(u => ({ id: u.id, username: u.username })));
 });
 
@@ -195,12 +216,12 @@ app.get('/users/:id', (req, res) => {
     const user = users.find(u => u.id == id);
     if (user) {
         crudOperationsTotal.inc({ operation: 'read', status: 'success' });
-        console.log(`[INFO] Usuário ${id} encontrado`);
+        logger.info('Usuário encontrado', { userId: Number(id) });
         res.json({ id: user.id, username: user.username });
     } else {
         crudOperationsTotal.inc({ operation: 'read', status: 'error' });
         errorsTotal.inc({ type: 'not_found', endpoint: '/users/:id' });
-        console.error(`[Erro] Usuário ${id} não encontrado`);
+        logger.warn('Usuário não encontrado', { userId: Number(id) });
         res.status(404).json({ error: 'Usuário não encontrado' });
     }
 });
@@ -212,7 +233,7 @@ app.put('/users/:id', (req, res) => {
     if (!user) {
         crudOperationsTotal.inc({ operation: 'update', status: 'error' });
         errorsTotal.inc({ type: 'not_found', endpoint: '/users/:id' });
-        console.error(`[Erro] Falha ao atualizar: Usuário ${id} não encontrado`);
+        logger.warn('Usuário não encontrado para atualização', { userId: Number(id) });
         return res.status(404).json({ error: 'Usuário não encontrado' });
     }
     if (!username && !password) {
@@ -222,7 +243,7 @@ app.put('/users/:id', (req, res) => {
     if (username) user.username = username;
     if (password) user.password = password;
     crudOperationsTotal.inc({ operation: 'update', status: 'success' });
-    console.log(`[INFO] Usuário ${id} atualizado`);
+    logger.info('Usuário atualizado', { userId: Number(id), username: user.username });
     res.json({ id: user.id, username: user.username });
 });
 
@@ -233,31 +254,31 @@ app.delete('/users/:id', (req, res) => {
         users.splice(index, 1);
         crudOperationsTotal.inc({ operation: 'delete', status: 'success' });
         activeUsersGauge.dec();
-        console.log(`[INFO] Usuário ${id} deletado`);
+        logger.info('Usuário deletado', { userId: Number(id) });
         res.status(204).send();
     } else {
         crudOperationsTotal.inc({ operation: 'delete', status: 'error' });
         errorsTotal.inc({ type: 'not_found', endpoint: '/users/:id' });
-        console.error(`[Erro] Falha ao deletar: Usuário ${id} não encontrado`);
+        logger.warn('Usuário não encontrado para deleção', { userId: Number(id) });
         res.status(404).json({ error: 'Usuário não encontrado' });
     }
 });
 
 app.get('/incidente-erro', (req, res) => {
-    console.error('[Erro] Simulação de incidente de alta taxa de erro disparada!');
+    logger.error('Simulação de incidente de alta taxa de erro disparada', { incidente: 'erro_500' });
     res.status(500).json({ error: 'Internal Server Error Simulado' });
 });
 
 app.get('/incidente-cpu', (req, res) => {
     const numCores = os.cpus().length;
-    console.log(`[INFO] Iniciando simulação de pico de CPU em ${numCores} núcleos...`);
+    logger.info('Iniciando simulação de pico de CPU', { incidente: 'cpu', numCores });
     let completedWorkers = 0;
     for (let i = 0; i < numCores; i++) {
         const worker = new Worker(path.join(__dirname, 'cpu-worker.js'));
         worker.on('exit', () => {
             completedWorkers++;
             if (completedWorkers === numCores) {
-                console.log('[INFO] Simulação de pico de CPU finalizada.');
+                logger.info('Simulação de pico de CPU finalizada', { incidente: 'cpu', numCores });
             }
         });
     }
@@ -265,9 +286,9 @@ app.get('/incidente-cpu', (req, res) => {
 });
 
 app.get('/incidente-delay', (req, res) => {
-    console.log('[INFO] Iniciando simulação de instabilidade (delay de 10s)...');
+    logger.info('Iniciando simulação de instabilidade (delay)', { incidente: 'delay_10s' });
     setTimeout(() => {
-        console.log('[INFO] Resposta atrasada enviada.');
+        logger.info('Resposta atrasada enviada', { incidente: 'delay_10s' });
         res.status(200).json({ message: 'Resposta com delay de 10 segundos' });
     }, 10000);
 });
@@ -278,7 +299,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 3001;
 if (require.main === module) {
     app.listen(PORT, () => {
-        console.log(`[INFO] Aplicação rodando na porta ${PORT}`);
+        logger.info('Servidor iniciado', { port: Number(PORT), nodeVersion: process.version });
     });
 }
 
