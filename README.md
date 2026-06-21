@@ -113,6 +113,7 @@ As regras de alerta são provisionadas automaticamente via `grafana/provisioning
 
 As regras de alerta estão provisionadas como arquivo; para modificá-las, edite `grafana/provisioning/alerting/rules.yml` e reinicie o Grafana.
 
+<<<<<<< HEAD
 ### Passo a passo
 
 1. **Crie uma conta no Render**  
@@ -194,3 +195,26 @@ done
 ├── .github/workflows/     # CI/CD pipeline
 └── docker-compose.yml     # Orquestracao
 ```
+
+---
+
+## Alertas Configurados (Grafana)
+
+As regras de alerta sao provisionadas automaticamente. Ao subir o ambiente, os seguintes alertas ja estarao ativos:
+
+| Alerta | Condicao | Severidade |
+|---|---|---|
+| Alta utilizacao de CPU | CPU > 80% por 5min | warning |
+| Alta taxa de erro HTTP 5xx | Erros 5xx > 10% | critical |
+| Latencia P95 elevada | P95 > 2 segundos | warning |
+| Servico DOWN | `up{job="node-app"} == 0` | critical |
+| Memoria alta | Uso > 85% | warning |
+
+### Configurando notificacoes
+
+1. Acesse Grafana → Alerting → Contact points
+2. Crie/edite um contact point (Slack, Email, Telegram)
+3. Preencha as credenciais e teste
+
+---
+*Desenvolvido para fins de estudo e aprimoramento em praticas de SRE e DevOps.*
