@@ -1,14 +1,15 @@
 let isLoginMode = true;
 let currentUser = null;
+let authToken = null;
 const SESSION_KEY = 'o11ylab_session';
-const SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
+const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
-// Restaurar sessao ao carregar a pagina
 (function restoreSession() {
     try {
         const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
-        if (saved && saved.username && saved.expiresAt && Date.now() < saved.expiresAt) {
+        if (saved && saved.username && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
             currentUser = saved.username;
+            authToken = saved.token;
             showDashboard();
         }
     } catch (e) {
@@ -16,7 +17,6 @@ const SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
     }
 })();
 
-// DOM Elements
 const loginView = document.getElementById('login-view');
 const dashboardView = document.getElementById('dashboard-view');
 const authForm = document.getElementById('auth-form');
@@ -24,16 +24,14 @@ const tabLogin = document.getElementById('tab-login');
 const tabRegister = document.getElementById('tab-register');
 const authSubmitBtn = document.getElementById('auth-submit-btn');
 const logoutBtn = document.getElementById('logout-btn');
-const usersList = document.getElementById('users-list');
 const currentUserDisplay = document.getElementById('current-user-display');
 const toastContainer = document.getElementById('toast-container');
 
-// Tabs Toggle
 tabLogin.addEventListener('click', () => {
     isLoginMode = true;
     tabLogin.classList.add('active');
     tabRegister.classList.remove('active');
-    authSubmitBtn.innerText = 'Entrar no Sistema';
+    authSubmitBtn.innerText = 'Entrar na Loja';
 });
 
 tabRegister.addEventListener('click', () => {
@@ -43,12 +41,10 @@ tabRegister.addEventListener('click', () => {
     authSubmitBtn.innerText = 'Criar Conta';
 });
 
-// Auth Submit
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
-
     const endpoint = isLoginMode ? '/login' : '/register';
     
     try {
@@ -57,18 +53,17 @@ authForm.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-        
         const data = await res.json();
         
         if (res.ok) {
             if (isLoginMode) {
                 currentUser = username;
+                authToken = data.token;
                 localStorage.setItem(SESSION_KEY, JSON.stringify({
-                    username: username,
-                    expiresAt: Date.now() + SESSION_EXPIRY_MS
+                    username, token: authToken, expiresAt: Date.now() + SESSION_EXPIRY_MS
                 }));
                 showDashboard();
-                showToast('Login efetuado! Sessao salva por 30 min.', 'success');
+                showToast('Login efetuado!', 'success');
             } else {
                 showToast('Conta criada! Voce ja pode logar.', 'success');
                 tabLogin.click();
@@ -89,15 +84,17 @@ function showDashboard() {
         dashboardView.style.display = 'flex';
         setTimeout(() => dashboardView.classList.add('active'), 50);
     }, 400);
-    
     currentUserDisplay.innerText = currentUser;
-    loadUsers();
+    loadCatalog();
+    loadCart();
+    loadOrders();
     updateStats();
     checkHealth();
 }
 
 logoutBtn.addEventListener('click', () => {
     currentUser = null;
+    authToken = null;
     localStorage.removeItem(SESSION_KEY);
     dashboardView.classList.remove('active');
     setTimeout(() => {
@@ -109,152 +106,218 @@ logoutBtn.addEventListener('click', () => {
     document.getElementById('password').value = '';
 });
 
-// ==================== CRUD ====================
+// ==================== CATALOGO ====================
 
-async function loadUsers() {
+async function loadCatalog(category) {
+    const grid = document.getElementById('catalog-grid');
     try {
-        const res = await fetch('/users');
-        const users = await res.json();
+        const url = category ? `/products?category=${encodeURIComponent(category)}` : '/products';
+        const res = await fetch(url);
+        const products = await res.json();
         
-        usersList.innerHTML = users.map(u => `
-            <tr>
-                <td>#${u.id}</td>
-                <td><strong>${escapeHtml(u.username)}</strong></td>
-                <td>${new Date().toLocaleDateString()}</td>
-                <td class="actions-cell">
-                    <button class="btn-sm btn-edit" onclick="startEdit(${u.id}, '${escapeHtml(u.username)}')">Editar</button>
-                    <button class="btn-sm btn-delete" onclick="deleteUser(${u.id})">Deletar</button>
-                </td>
-            </tr>
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        if (category) {
+            Array.from(document.querySelectorAll('.cat-btn')).find(b => b.textContent === category)?.classList.add('active');
+        } else {
+            document.querySelector('.cat-btn').classList.add('active');
+        }
+
+        grid.innerHTML = products.map(p => `
+            <div class="product-card">
+                <div class="product-category">${escapeHtml(p.category)}</div>
+                <div class="product-name">${escapeHtml(p.name)}</div>
+                <div class="product-desc">${escapeHtml(p.description || '')}</div>
+                <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+                <div class="product-stock ${p.stock < 5 ? 'low' : ''}">${p.stock} em estoque</div>
+                <div class="product-actions">
+                    <input type="number" class="qty-input" id="qty-${p.id}" value="1" min="1" max="${p.stock}">
+                    <button onclick="addToCart(${p.id})" class="btn-success" ${p.stock === 0 ? 'disabled' : ''}>
+                        ${p.stock === 0 ? 'Esgotado' : 'Comprar'}
+                    </button>
+                </div>
+            </div>
         `).join('');
         
-        document.getElementById('stat-users').innerText = users.length;
+        document.getElementById('stat-products').innerText = products.length;
     } catch (err) {
-        showToast('Erro ao carregar usuarios', 'error');
+        showToast('Erro ao carregar catalogo', 'error');
     }
 }
 
-async function createUser() {
-    const username = document.getElementById('new-username').value.trim();
-    const password = document.getElementById('new-password').value;
-    
-    if (!username || !password) {
-        document.getElementById('create-message').innerText = 'Preencha todos os campos';
-        return;
-    }
+// ==================== CARRINHO ====================
+
+async function addToCart(productId) {
+    const qtyInput = document.getElementById(`qty-${productId}`);
+    const quantity = parseInt(qtyInput?.value || 1);
     
     try {
-        const res = await fetch('/register', {
+        const res = await fetch('/cart', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ productId, quantity })
         });
         const data = await res.json();
-        
         if (res.ok) {
-            document.getElementById('create-message').innerHTML = '<span style="color:var(--success)">Usuario criado!</span>';
-            document.getElementById('new-username').value = '';
-            document.getElementById('new-password').value = '';
-            loadUsers();
-            updateStats();
-            showToast(`Usuario "${username}" criado`, 'success');
+            showToast('Adicionado ao carrinho!', 'success');
+            loadCart();
         } else {
-            document.getElementById('create-message').innerHTML = `<span style="color:var(--danger)">${data.error}</span>`;
-        }
-    } catch (err) {
-        document.getElementById('create-message').innerText = 'Erro de conexao';
-    }
-}
-
-let editingUserId = null;
-
-function startEdit(id, currentUsername) {
-    editingUserId = id;
-    document.getElementById('edit-user-id').innerText = '#' + id;
-    document.getElementById('edit-username').value = currentUsername;
-    document.getElementById('edit-password').value = '';
-    document.getElementById('edit-form').style.display = 'block';
-}
-
-function cancelEdit() {
-    editingUserId = null;
-    document.getElementById('edit-form').style.display = 'none';
-    document.getElementById('edit-username').value = '';
-    document.getElementById('edit-password').value = '';
-}
-
-async function updateUser() {
-    const username = document.getElementById('edit-username').value.trim();
-    const password = document.getElementById('edit-password').value;
-    
-    if (!username && !password) {
-        showToast('Preencha ao menos um campo', 'error');
-        return;
-    }
-    
-    try {
-        const body = {};
-        if (username) body.username = username;
-        if (password) body.password = password;
-        
-        const res = await fetch(`/users/${editingUserId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            showToast('Usuario atualizado!', 'success');
-            cancelEdit();
-            loadUsers();
-        } else {
-            showToast(data.error || 'Erro ao atualizar', 'error');
+            showToast(data.error || 'Erro ao adicionar', 'error');
         }
     } catch (err) {
         showToast('Erro de conexao', 'error');
     }
 }
 
-async function deleteUser(id) {
-    if (!confirm(`Deletar usuario #${id}?`)) return;
+async function loadCart() {
+    const container = document.getElementById('cart-items');
+    const totalEl = document.getElementById('cart-total');
+    const badge = document.getElementById('cart-count-badge');
+    
     try {
-        const res = await fetch(`/users/${id}`, { method: 'DELETE' });
+        const res = await fetch('/cart', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (!res.ok) { container.innerHTML = '<p class="empty-cart">Faca login para ver o carrinho</p>'; return; }
+        
+        const data = await res.json();
+        if (!data.items || data.items.length === 0) {
+            container.innerHTML = '<p class="empty-cart">Seu carrinho esta vazio</p>';
+            totalEl.style.display = 'none';
+            badge.innerText = '0';
+            return;
+        }
+        
+        badge.innerText = data.items.length;
+        container.innerHTML = data.items.map(item => `
+            <div class="cart-item">
+                <span class="cart-item-name">${escapeHtml(item.name)}</span>
+                <span class="cart-item-qty">x${item.quantity}</span>
+                <span class="cart-item-subtotal">R$ ${item.subtotal.toFixed(2)}</span>
+                <button class="cart-item-remove" onclick="removeFromCart(${item.productId})">x</button>
+            </div>
+        `).join('');
+        
+        document.getElementById('cart-total-value').innerText = `R$ ${data.total.toFixed(2)}`;
+        totalEl.style.display = 'flex';
+    } catch (err) {
+        container.innerHTML = '<p class="empty-cart">Erro ao carregar carrinho</p>';
+    }
+}
+
+async function removeFromCart(productId) {
+    try {
+        await fetch(`/cart/${productId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        loadCart();
+        showToast('Item removido', 'info');
+    } catch (err) {
+        showToast('Erro ao remover', 'error');
+    }
+}
+
+// ==================== CHECKOUT ====================
+
+async function checkout() {
+    try {
+        const res = await fetch('/checkout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
         if (res.ok) {
-            showToast(`Usuario #${id} deletado`, 'success');
-            loadUsers();
+            showToast(`Pedido #${data.orderId} criado! Total: R$ ${data.totalValue.toFixed(2)}`, 'success');
+            loadCart();
+            loadOrders();
             updateStats();
         } else {
-            const data = await res.json();
-            showToast(data.error || 'Erro ao deletar', 'error');
+            showToast(data.error || 'Erro no checkout', 'error');
         }
     } catch (err) {
         showToast('Erro de conexao', 'error');
     }
 }
 
-// ==================== INCIDENTS ====================
+// ==================== PEDIDOS ====================
+
+async function loadOrders() {
+    const container = document.getElementById('orders-list');
+    
+    try {
+        const res = await fetch('/orders', {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (!res.ok) { container.innerHTML = '<p class="empty-cart">Faca login para ver pedidos</p>'; return; }
+        
+        const orders = await res.json();
+        if (!orders || orders.length === 0) {
+            container.innerHTML = '<p class="empty-cart">Nenhum pedido ainda</p>';
+            document.getElementById('stat-orders').innerText = '0';
+            return;
+        }
+        
+        document.getElementById('stat-orders').innerText = orders.length;
+        const statusNames = { pending: 'Pendente', paid: 'Pago', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado' };
+        
+        container.innerHTML = orders.map(o => `
+            <div class="order-card">
+                <div class="order-header">
+                    <span class="order-id">Pedido #${o.id}</span>
+                    <span class="status-badge status-${o.status}">${statusNames[o.status] || o.status}</span>
+                </div>
+                <div class="order-items-list">
+                    ${(o.items || []).map(i => `${i.name} x${i.quantity} — R$ ${i.subtotal.toFixed(2)}`).join('<br>')}
+                </div>
+                <div style="margin-top:0.3rem;font-weight:600">Total: R$ ${o.totalValue.toFixed(2)}</div>
+                ${o.status === 'pending' ? `<button onclick="payOrder(${o.id})" class="btn-success" style="margin-top:0.5rem;font-size:0.75rem">Pagar Agora</button>` : ''}
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = '<p class="empty-cart">Erro ao carregar pedidos</p>';
+    }
+}
+
+async function payOrder(orderId) {
+    try {
+        const res = await fetch(`/orders/${orderId}/pay`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Pagamento aprovado!', 'success');
+        } else {
+            showToast(data.error || 'Pagamento recusado', 'error');
+        }
+        loadOrders();
+        updateStats();
+    } catch (err) {
+        showToast('Erro ao processar pagamento', 'error');
+    }
+}
+
+// ==================== INCIDENTES ====================
 
 async function triggerIncident(type) {
     showToast(`Disparando incidente: ${type}...`, 'info');
     try {
         const res = await fetch(`/incidente-${type}`);
         const data = await res.json();
-        if (res.ok) {
-            showToast(data.message || 'Incidente executado', 'warning');
-        } else {
-            showToast(data.error || 'Incidente gerou erro (esperado)', 'error');
-        }
+        showToast(data.message || 'Incidente executado', 'warning');
     } catch (err) {
-        showToast('Servidor demorou ou falhou (incidente OK)', 'error');
+        showToast('Incidente disparado (sem resposta)', 'error');
     }
     updateStats();
 }
 
-// ==================== ECOMMERCE SIMULATIONS ====================
+// ==================== SIMULACOES ECOMMERCE ====================
 
 async function simularEcommerce(tipo) {
-    const logBox = document.getElementById('ecommerce-log');
+    const logBox = document.getElementById('simulation-log');
     const nomes = {
         'black-friday': 'Black Friday',
         'estoque-esgotado': 'Estoque Esgotado',
@@ -262,83 +325,37 @@ async function simularEcommerce(tipo) {
         'fluxo-completo': 'Fluxo Completo'
     };
     const nome = nomes[tipo] || tipo;
-
-    logBox.innerHTML = `<p style="color:var(--accent)">Executando simulacao: ${nome}...</p>`;
+    
+    logBox.innerHTML = `<p style="color:var(--info)">Executando: ${nome}...</p>`;
     showToast(`Disparando ${nome}...`, 'info');
-
+    
     try {
         const res = await fetch(`/simular/${tipo}`, { method: 'POST' });
         const data = await res.json();
-
+        
         if (res.ok) {
             logBox.innerHTML += `<p style="color:var(--success)">${data.message || 'Simulacao concluida'}</p>`;
-            // Exibe resumo numerico (results como objeto)
-            if (data.results && !Array.isArray(data.results)) {
-                for (const [key, val] of Object.entries(data.results)) {
-                    const color = key === 'errors' ? 'var(--danger)' : 'var(--success)';
-                    logBox.innerHTML += `<p>${key}: <span style="color:${color}">${val}</span></p>`;
-                }
-            }
-            // Exibe lista de tentativas (results como array)
-            if (Array.isArray(data.results) && data.results.length > 0) {
-                if (data.results[0].success !== undefined) {
-                    const s = data.results.filter(r => r.success).length;
-                    const f = data.results.filter(r => !r.success).length;
-                    logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${s}</span> | Falhas: <span style="color:var(--danger)">${f}</span></p>`;
-                }
-                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Tentativas:</strong></p>';
-                data.results.slice(0, 10).forEach(r => {
-                    const ok = r.success !== false;
-                    logBox.innerHTML += `<p style="color:${ok ? 'var(--success)' : 'var(--danger)'}">  → #${r.attempt}: ${r.status || r.error || 'OK'}</p>`;
-                });
-            }
-            // Exibe fluxo (fluxo-completo)
-            if (data.flow) {
-                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Fluxo:</strong></p>';
-                data.flow.forEach(step => {
-                    logBox.innerHTML += `<p style="color:var(--success)">  → ${step.step}: ${step.status || step.username || step.orderId || JSON.stringify(step)}</p>`;
+            if (data.results) logBox.innerHTML += `<p>Catalogo: ${data.results.catalogViews} | Carrinho: ${data.results.cartAdds} | Checkouts: ${data.results.checkouts} | Erros: ${data.results.errors}</p>`;
+            if (data.sucessos !== undefined) logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${data.sucessos}</span> | Falhas: <span style="color:var(--danger)">${data.falhas}</span></p>`;
+            if (data.log) {
+                data.log.forEach(entry => {
+                    const color = entry.status >= 400 ? 'var(--danger)' : entry.status >= 200 ? 'var(--success)' : 'var(--text-secondary)';
+                    logBox.innerHTML += `<p style="color:${color}">  -> ${entry.etapa}: HTTP ${entry.status}${entry.aprovado !== undefined ? (entry.aprovado ? ' Pago' : ' Recusado') : ''}</p>`;
                 });
             }
             showToast(`${nome} concluida!`, 'success');
         } else {
-            logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${data.error || 'Falha na simulacao'}</p>`;
+            logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${data.error || 'Falha'}</p>`;
             showToast(data.error || 'Erro na simulacao', 'error');
         }
     } catch (err) {
-        logBox.innerHTML += `<p style="color:var(--danger)">Erro de conexao: ${err.message}</p>`;
-        showToast('Erro de conexao com a API', 'error');
-    }
-
-    logBox.scrollTop = logBox.scrollHeight;
-    updateStats();
-}
-
-// ==================== BRUTE FORCE SIMULATION ====================
-
-async function simulateBruteForce() {
-    const logBox = document.getElementById('bruteforce-log');
-    logBox.innerHTML = '<p>Iniciando simulacao de ataque...</p>';
-    
-    // Register test user first
-    await fetch('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'hacker_target', password: 'realpass' })
-    });
-    
-    for (let i = 1; i <= 8; i++) {
-        const res = await fetch('/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: 'hacker_target', password: 'wrong' + i })
-        });
-        const status = res.status;
-        const color = status === 429 ? 'var(--danger)' : status === 401 ? 'var(--warning)' : 'var(--text-secondary)';
-        logBox.innerHTML += `<p style="color:${color}">Tentativa ${i}: HTTP ${status} ${status === 429 ? 'BLOQUEADO' : status === 401 ? 'Falha' : ''}</p>`;
+        logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${err.message}</p>`;
+        showToast('Erro de conexao', 'error');
     }
     
-    logBox.innerHTML += '<p style="color:var(--success);margin-top:0.5rem">Ataque bloqueado pelo rate limit! Veja as metricas no Grafana.</p>';
     updateStats();
+    loadCart();
+    loadOrders();
 }
 
 // ==================== STATS ====================
@@ -347,21 +364,17 @@ async function updateStats() {
     try {
         const res = await fetch('/metrics');
         const text = await res.text();
-        
-        // Parse Prometheus text format
         const getVal = (name, label) => {
             const regex = label 
-                ? new RegExp(`${name}{${label}}[\\s"]+([0-9.e+]+)`)
+                ? new RegExp(`${name}{${label}}[\\\\s\"]+([0-9.e+]+)`)
                 : new RegExp(`${name}\\s+([0-9.e+]+)`);
             const match = text.match(regex);
             return match ? parseFloat(match[1]) || 0 : 0;
         };
         
-        document.getElementById('stat-registrations').innerText = getVal('app_registrations_total');
-        document.getElementById('stat-logins-ok').innerText = getVal('app_logins_total', 'status="success"');
-        document.getElementById('stat-logins-fail').innerText = getVal('app_logins_total', 'status="failure"');
+        const revenue = getVal('app_revenue_total');
+        document.getElementById('stat-revenue').innerText = `R$ ${revenue.toFixed(2)}`;
         
-        // Sum all error types
         const errorMatch = text.match(/app_errors_total\{[^}]*\}\s+([0-9.e+]+)/g);
         let totalErrors = 0;
         if (errorMatch) {
@@ -371,9 +384,7 @@ async function updateStats() {
             });
         }
         document.getElementById('stat-errors').innerText = totalErrors;
-    } catch (e) {
-        // Silently fail - stats are cosmetic
-    }
+    } catch (e) {}
 }
 
 async function checkHealth() {
@@ -387,17 +398,12 @@ async function checkHealth() {
     }
 }
 
-// Refresh stats every 10 seconds
 setInterval(() => {
-    if (currentUser) {
-        updateStats();
-        checkHealth();
-    }
+    if (currentUser) { updateStats(); checkHealth(); }
 }, 10000);
 
-// ==================== HELPERS ====================
-
 function escapeHtml(str) {
+    if (!str) return '';
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;

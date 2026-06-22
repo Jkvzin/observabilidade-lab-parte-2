@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observabilidade Lab 2</title>
+    <title>TechStore - Observabilidade Lab 2</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -13,11 +13,10 @@
         <div class="blob blob-2"></div>
     </div>
 
-    <!-- LOGIN VIEW -->
     <main id="login-view" class="view active">
         <div class="glass-panel login-card">
-            <h1>O11y<span>Lab 2</span></h1>
-            <p>Observabilidade e Seguranca</p>
+            <h1>Tech<span>Store</span></h1>
+            <p>Observabilidade e SRE - Ecommerce</p>
             <div class="tabs">
                 <button class="tab-btn active" id="tab-login">Login</button>
                 <button class="tab-btn" id="tab-register">Registro</button>
@@ -31,20 +30,19 @@
                     <label for="password">Senha</label>
                     <input type="password" id="password" placeholder="Digite sua senha" required>
                 </div>
-                <button type="submit" class="btn-primary" id="auth-submit-btn">Entrar no Sistema</button>
+                <button type="submit" class="btn-primary" id="auth-submit-btn">Entrar na Loja</button>
             </form>
             <div id="auth-message" class="message"></div>
             <div class="login-info">
-                <p>Sessao salva por 30 min (sobrevive ao F5)</p>
-                <p>Limite: 5 tentativas de login a cada 30 segundos</p>
+                <p>Sessao salva por 30 min</p>
+                <p>Limite: 5 tentativas a cada 30s</p>
             </div>
         </div>
     </main>
 
-    <!-- DASHBOARD VIEW -->
     <main id="dashboard-view" class="view">
         <nav class="glass-navbar">
-            <div class="logo">O11y<span>Lab 2</span></div>
+            <div class="logo">Tech<span>Store</span></div>
             <div class="nav-links">
                 <a href="http://localhost:3000" target="_blank" class="nav-link">Grafana</a>
                 <a href="http://localhost:9090" target="_blank" class="nav-link">Prometheus</a>
@@ -57,75 +55,51 @@
             </div>
         </nav>
 
-        <!-- Status Bar -->
         <div class="status-bar">
             <div class="status-item" id="status-health">
                 <span class="status-dot green"></span> API Online
             </div>
-            <div class="status-item">
-                Usuarios: <strong id="stat-users">0</strong>
-            </div>
-            <div class="status-item">
-                Registros: <strong id="stat-registrations">0</strong>
-            </div>
-            <div class="status-item">
-                Logins OK: <strong id="stat-logins-ok">0</strong>
-            </div>
-            <div class="status-item">
-                Falhas: <strong id="stat-logins-fail">0</strong>
-            </div>
-            <div class="status-item">
-                Erros: <strong id="stat-errors">0</strong>
-            </div>
+            <div class="status-item">Produtos: <strong id="stat-products">0</strong></div>
+            <div class="status-item">Pedidos: <strong id="stat-orders">0</strong></div>
+            <div class="status-item">Receita: <strong id="stat-revenue">R$ 0</strong></div>
+            <div class="status-item">Erros: <strong id="stat-errors">0</strong></div>
         </div>
 
         <div class="dashboard-grid">
-            <!-- CRUD Panel -->
-            <section class="glass-panel crud-section">
-                <h2>Gerenciamento de Usuarios</h2>
-
-                <!-- Create User Form -->
-                <div class="create-user-form">
-                    <h3>Novo Usuario</h3>
-                    <div class="form-row">
-                        <input type="text" id="new-username" placeholder="Username" class="input-sm">
-                        <input type="password" id="new-password" placeholder="Senha" class="input-sm">
-                        <button onclick="createUser()" class="btn-success">Criar</button>
-                    </div>
-                    <div id="create-message" class="message-sm"></div>
+            <section class="glass-panel catalog-section">
+                <h2>Catalogo de Produtos</h2>
+                <div class="category-filter">
+                    <button class="cat-btn active" onclick="loadCatalog()">Todos</button>
+                    <button class="cat-btn" onclick="loadCatalog('Eletronicos')">Eletronicos</button>
+                    <button class="cat-btn" onclick="loadCatalog('Acessorios')">Acessorios</button>
+                    <button class="cat-btn" onclick="loadCatalog('Moveis')">Moveis</button>
+                    <button class="cat-btn" onclick="loadCatalog('Componentes')">Componentes</button>
+                    <button class="cat-btn" onclick="loadCatalog('Redes')">Redes</button>
                 </div>
-
-                <!-- Edit User Form (hidden by default) -->
-                <div class="create-user-form" id="edit-form" style="display:none">
-                    <h3>Editar Usuario <span id="edit-user-id"></span></h3>
-                    <div class="form-row">
-                        <input type="text" id="edit-username" placeholder="Novo username" class="input-sm">
-                        <input type="password" id="edit-password" placeholder="Nova senha" class="input-sm">
-                        <button onclick="updateUser()" class="btn-warning">Salvar</button>
-                        <button onclick="cancelEdit()" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-
-                <!-- Users Table -->
-                <div class="table-container">
-                    <table id="users-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Usuario</th>
-                                <th>Criado em</th>
-                                <th>Acoes</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-list"></tbody>
-                    </table>
-                </div>
-                <button class="btn-secondary" onclick="loadUsers()" style="margin-top:1rem">Atualizar Lista</button>
+                <div id="catalog-grid" class="catalog-grid"></div>
             </section>
 
-            <!-- Right Column -->
             <div class="right-column">
-                <!-- Incidents Panel -->
+                <section class="glass-panel cart-section">
+                    <h2>Carrinho <span id="cart-count-badge" class="badge">0</span></h2>
+                    <div id="cart-items" class="cart-items">
+                        <p class="empty-cart">Seu carrinho esta vazio</p>
+                    </div>
+                    <div id="cart-total" class="cart-total" style="display:none">
+                        <span>Total: <strong id="cart-total-value">R$ 0</strong></span>
+                        <button onclick="checkout()" class="btn-success" id="checkout-btn">Finalizar Compra</button>
+                    </div>
+                    <div id="cart-message" class="message-sm"></div>
+                </section>
+
+                <section class="glass-panel orders-section">
+                    <h2>Meus Pedidos</h2>
+                    <button onclick="loadOrders()" class="btn-secondary" style="margin-bottom:0.5rem">Atualizar</button>
+                    <div id="orders-list" class="orders-list">
+                        <p class="empty-cart">Nenhum pedido ainda</p>
+                    </div>
+                </section>
+
                 <section class="glass-panel incidents-section">
                     <h2>Painel de Incidentes</h2>
                     <p>Dispare simulacoes para testar monitoramento.</p>
@@ -133,76 +107,31 @@
                         <div class="incident-card error">
                             <div class="icon">500</div>
                             <h3>Erro Critico</h3>
-                            <p>Forca erro HTTP 500</p>
                             <button onclick="triggerIncident('erro')" class="btn-danger">Disparar</button>
                         </div>
                         <div class="incident-card cpu">
                             <div class="icon">CPU</div>
                             <h3>Sobrecarga CPU</h3>
-                            <p>Estressa todos os nucleos</p>
                             <button onclick="triggerIncident('cpu')" class="btn-warning">Disparar</button>
                         </div>
                         <div class="incident-card delay">
                             <div class="icon">10s</div>
                             <h3>Delay</h3>
-                            <p>Resposta em 10 segundos</p>
                             <button onclick="triggerIncident('delay')" class="btn-info">Disparar</button>
                         </div>
                     </div>
                 </section>
 
-                <!-- Simulações Ecommerce -->
                 <section class="glass-panel incidents-section">
                     <h2>Simulacoes Ecommerce</h2>
-                    <p>Cenarios de negocio para observabilidade.</p>
-                    <div class="incident-cards">
-                        <div class="incident-card ecommerce">
-                            <div class="icon">BF</div>
-                            <h3>Black Friday</h3>
-                            <p>50 req. paralelas (pico)</p>
-                            <button onclick="simularEcommerce('black-friday')" class="btn-danger">Disparar</button>
-                        </div>
-                        <div class="incident-card ecommerce">
-                            <div class="icon">ES</div>
-                            <h3>Estoque Esgotado</h3>
-                            <p>10x compra sem estoque</p>
-                            <button onclick="simularEcommerce('estoque-esgotado')" class="btn-warning">Disparar</button>
-                        </div>
-                        <div class="incident-card ecommerce">
-                            <div class="icon">PG</div>
-                            <h3>Falha Pagamento</h3>
-                            <p>5x tentativas de pagar</p>
-                            <button onclick="simularEcommerce('falha-pagamento')" class="btn-info">Disparar</button>
-                        </div>
-                        <div class="incident-card ecommerce">
-                            <div class="icon">FC</div>
-                            <h3>Fluxo Completo</h3>
-                            <p>Registro → Compra</p>
-                            <button onclick="simularEcommerce('fluxo-completo')" class="btn-success">Disparar</button>
-                        </div>
+                    <p>Cenarios realistas de loja virtual.</p>
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem">
+                        <button onclick="simulateBlackFriday()" class="btn-danger">Black Friday (50 req)</button>
+                        <button onclick="simulateStockOut()" class="btn-warning">Estoque Esgotado</button>
+                        <button onclick="simulatePaymentFailure()" class="btn-info">Falha Pagamento (5x)</button>
+                        <button onclick="simulateFullFlow()" class="btn-success">Fluxo Completo</button>
                     </div>
-                    <div id="ecommerce-log" class="log-box"></div>
-                </section>
-
-                <!-- Brute Force Test -->
-                <section class="glass-panel incidents-section">
-                    <h2>Teste de Seguranca</h2>
-                    <p>Simule um ataque (8 tentativas, bloqueio em 30s).</p>
-                    <button onclick="simulateBruteForce()" class="btn-danger" style="width:100%">
-                        Simular Ataque Brute Force
-                    </button>
-                    <div id="bruteforce-log" class="log-box"></div>
-                </section>
-
-                <!-- Attack Detection Info -->
-                <section class="glass-panel incidents-section">
-                    <h2>Deteccao de Ataques</h2>
-                    <div class="detection-info">
-                        <p>Rate limit login: <strong>5 tentativas / 30 segundos</strong></p>
-                        <p>Rate limit geral: <strong>100 req / 30 segundos</strong></p>
-                        <p>Senhas: <strong>bcrypt (nunca plain text)</strong></p>
-                        <p>Headers: <strong>helmet (XSS, CSP, HSTS)</strong></p>
-                    </div>
+                    <div id="simulation-log" class="log-box"></div>
                 </section>
             </div>
         </div>
