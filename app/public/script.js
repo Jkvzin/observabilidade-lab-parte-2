@@ -272,15 +272,31 @@ async function simularEcommerce(tipo) {
 
         if (res.ok) {
             logBox.innerHTML += `<p style="color:var(--success)">${data.message || 'Simulacao concluida'}</p>`;
-            if (data.total) logBox.innerHTML += `<p>Total requisicoes: ${data.total}</p>`;
-            if (data.erros !== undefined) logBox.innerHTML += `<p>Erros: <span style="color:var(--danger)">${data.erros}</span></p>`;
-            if (data.erros400 !== undefined) logBox.innerHTML += `<p>Erros 400: <span style="color:var(--danger)">${data.erros400}</span></p>`;
-            if (data.sucessos !== undefined) logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${data.sucessos}</span> | Falhas: <span style="color:var(--danger)">${data.falhas}</span></p>`;
-            if (data.log) {
-                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Log do fluxo:</strong></p>';
-                data.log.forEach(entry => {
-                    const statusColor = entry.status >= 400 ? 'var(--danger)' : entry.status >= 200 ? 'var(--success)' : 'var(--text-secondary)';
-                    logBox.innerHTML += `<p style="color:${statusColor}">  → ${entry.etapa}: HTTP ${entry.status}${entry.aprovado !== undefined ? (entry.aprovado ? ' ✓ Pago' : ' ✗ Recusado') : ''}</p>`;
+            // Exibe resumo numerico (results como objeto)
+            if (data.results && !Array.isArray(data.results)) {
+                for (const [key, val] of Object.entries(data.results)) {
+                    const color = key === 'errors' ? 'var(--danger)' : 'var(--success)';
+                    logBox.innerHTML += `<p>${key}: <span style="color:${color}">${val}</span></p>`;
+                }
+            }
+            // Exibe lista de tentativas (results como array)
+            if (Array.isArray(data.results) && data.results.length > 0) {
+                if (data.results[0].success !== undefined) {
+                    const s = data.results.filter(r => r.success).length;
+                    const f = data.results.filter(r => !r.success).length;
+                    logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${s}</span> | Falhas: <span style="color:var(--danger)">${f}</span></p>`;
+                }
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Tentativas:</strong></p>';
+                data.results.slice(0, 10).forEach(r => {
+                    const ok = r.success !== false;
+                    logBox.innerHTML += `<p style="color:${ok ? 'var(--success)' : 'var(--danger)'}">  → #${r.attempt}: ${r.status || r.error || 'OK'}</p>`;
+                });
+            }
+            // Exibe fluxo (fluxo-completo)
+            if (data.flow) {
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Fluxo:</strong></p>';
+                data.flow.forEach(step => {
+                    logBox.innerHTML += `<p style="color:var(--success)">  → ${step.step}: ${step.status || step.username || step.orderId || JSON.stringify(step)}</p>`;
                 });
             }
             showToast(`${nome} concluida!`, 'success');
@@ -293,7 +309,6 @@ async function simularEcommerce(tipo) {
         showToast('Erro de conexao com a API', 'error');
     }
 
-    // Rola o log para o fim
     logBox.scrollTop = logBox.scrollHeight;
     updateStats();
 }
