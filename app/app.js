@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { Worker } = require('worker_threads');
 const os = require('os');
+const http = require('http');
 const logger = require('./logger');
 
 const app = express();
@@ -70,7 +71,7 @@ const ordersTotal = new promClient.Counter({
     labelNames: ['status']
 });
 
-const revenueTotal = new promClient.Counter({
+const revenueTotal = new promClient.Gauge({
     name: 'app_revenue_total',
     help: 'Receita total em R$ (pedidos pagos)'
 });
@@ -605,204 +606,197 @@ app.get('/incidente-delay', (req, res) => {
     }, 10000);
 });
 
-// ==================== SIMULACOES DE CENARIOS REALISTAS (ECOMMERCE) ====================
-app.post('/simular/black-friday', async (req, res) => {
-    logger.info('Simulação Black Friday iniciada', { action: 'simulation_black_friday_start' });
-    const results = { catalogViews: 0, cartAdds: 0, checkouts: 0, errors: 0 };
+// ==================== HELPER HTTP INTERNO ====================
+// Faz chamadas HTTP reais ao proprio servidor para gerar metricas e logs
+function internalRequest(method, path, body, token) {
+    return new Promise((resolve, reject) => {
+        const url = new URL(path, `http://localhost:${PORT}`);
+        const data = body ? JSON.stringify(body) : null;
+        const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}),
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
+        };
+        const req = http.request(options, (resp) => {
+            let body = '';
+            resp.on('data', chunk => body += chunk);
+            resp.on('end', () => {
+                try { resolve({ status: resp.statusCode, data: JSON.parse(body) }); }
+                catch { resolve({ status: resp.statusCode, data: body }); }
+            });
+        });
+        req.on('error', reject);
+        if (data) req.write(data);
+        req.end();
+    });
+}
 
-    for (let i = 0; i < 50; i++) {
-        try {
+// ==================== SIMULACOES DE CENARIOS REALISTAS (ECOMMERCE) ====================
+
+// Simula pico de Black Friday: 50 chamadas HTTP paralelas (catalogo + carrinho)
+app.post('/simular/black-friday', async (req, res) => {
+    logger.info('Simulacao Black Friday iniciada', { action: 'simulation_black_friday_start' });
+    const results = { catalogViews: 0, cartAdds: 0, checkouts: 0, errors: 0 };
+    const PORT = process.env.PORT || 3001;
+
+    // Criar usuario de teste para o carrinho
+    try {
+        const reg = await internalRequest('POST', '/register', { username: `bf_${Date.now()}`, password: 'bf123456' });
+        const token = reg.data?.token;
+        const promises = [];
+
+        for (let i = 0; i < 50; i++) {
             const rand = Math.random();
             if (rand < 0.6) {
-                // 60%: visualizar catálogo
-                results.catalogViews++;
+                // 60%: GET /products
+                promises.push(
+                    internalRequest('GET', '/products').then(r => {
+                        if (r.status < 400) results.catalogViews++;
+                        else results.errors++;
+                    }).catch(() => results.errors++)
+                );
             } else if (rand < 0.9) {
-                // 30%: adicionar ao carrinho (produto aleatório)
-                const product = products[Math.floor(Math.random() * products.length)];
-                if (product && product.stock > 0) {
-                    const cart = getCart(999); // usuário anônimo de simulação
-                    const existing = cart.find(c => c.productId === product.id);
-                    if (existing) existing.quantity++;
-                    else cart.push({ productId: product.id, quantity: 1 });
-                    cartItemsTotal.inc();
-                    results.cartAdds++;
-                }
+                // 30%: POST /cart (produto aleatorio 1-10)
+                const pid = Math.floor(Math.random() * 10) + 1;
+                promises.push(
+                    internalRequest('POST', '/cart', { productId: pid, quantity: 1 }, token).then(r => {
+                        if (r.status < 400) results.cartAdds++;
+                        else results.errors++;
+                    }).catch(() => results.errors++)
+                );
             } else {
-                // 10%: checkout (se tiver itens no carrinho)
-                const cart = getCart(999);
-                if (cart.length > 0) {
-                    for (const item of cart) {
-                        const prod = products.find(p => p.id === item.productId);
-                        if (prod && prod.stock >= item.quantity) {
-                            prod.stock -= item.quantity;
-                            stockByProduct.set({ product: prod.name }, prod.stock);
-                        }
-                    }
-                    const order = {
-                        id: currentId++,
-                        userId: 999,
-                        items: cart.map(item => {
-                            const p = products.find(pr => pr.id === item.productId);
-                            return { productId: item.productId, name: p.name, price: p.price, quantity: item.quantity, subtotal: p.price * item.quantity };
-                        }),
-                        totalValue: cart.reduce((sum, item) => {
-                            const p = products.find(pr => pr.id === item.productId);
-                            return sum + (p ? p.price * item.quantity : 0);
-                        }, 0),
-                        status: 'pending',
-                        createdAt: new Date().toISOString()
-                    };
-                    orders.push(order);
-                    ordersTotal.inc({ status: 'pending' });
-                    checkoutsTotal.inc();
-                    carts[999] = [];
-                    cartItemsTotal.set(0);
-                    results.checkouts++;
-                }
+                // 10%: tentar checkout
+                promises.push(
+                    internalRequest('POST', '/checkout', null, token).then(r => {
+                        if (r.status === 201) results.checkouts++;
+                        else results.errors++;
+                    }).catch(() => results.errors++)
+                );
             }
-        } catch (e) {
-            results.errors++;
         }
+
+        await Promise.all(promises);
+    } catch (e) {
+        results.errors++;
     }
 
-    logger.info('Simulação Black Friday concluída', { action: 'simulation_black_friday_end', ...results });
-    res.json({ message: 'Black Friday simulada!', results });
+    logger.info('Simulacao Black Friday concluida', { action: 'simulation_black_friday_end', ...results });
+    res.json({ message: 'Black Friday simulada com 50 chamadas HTTP paralelas!', results });
 });
 
-app.post('/simular/estoque-esgotado', (req, res) => {
-    logger.info('Simulação estoque esgotado iniciada', { action: 'simulation_stock_out_start' });
-    const outOfStockProduct = products.find(p => p.stock === 0) || products[0];
-    const originalStock = outOfStockProduct.stock;
-    outOfStockProduct.stock = 0;
-    stockByProduct.set({ product: outOfStockProduct.name }, 0);
-
+// Simula 10 tentativas de comprar produto com estoque zerado
+app.post('/simular/estoque-esgotado', async (req, res) => {
+    logger.info('Simulacao estoque esgotado iniciada', { action: 'simulation_stock_out_start' });
     const results = [];
+
+    // Criar usuario e pegar um produto com pouco estoque
+    const reg = await internalRequest('POST', '/register', { username: `stockout_${Date.now()}`, password: 'test123456' });
+    const token = reg.data?.token;
+    const catalog = await internalRequest('GET', '/products');
+    const prod = (catalog.data || [])[0];
+    const productId = prod?.id || 1;
+
+    // Zerar estoque temporariamente via atualizacao
+    await internalRequest('PUT', `/products/${productId}`, { stock: 0 });
+
+    // 10 tentativas de adicionar ao carrinho
+    const promises = [];
     for (let i = 0; i < 10; i++) {
-        const cart = getCart(998);
-        const existing = cart.find(c => c.productId === outOfStockProduct.id);
-        if (existing && existing.quantity >= 99) {
-            results.push({ attempt: i + 1, status: 400, error: 'Estoque insuficiente' });
-        } else if (originalStock === 0) {
-            results.push({ attempt: i + 1, status: 400, error: 'Estoque insuficiente' });
-        } else {
-            results.push({ attempt: i + 1, status: 400, error: 'Estoque insuficiente' });
-        }
-        errorsTotal.inc({ type: 'validation', endpoint: '/cart' });
+        promises.push(
+            internalRequest('POST', '/cart', { productId, quantity: 1 }, token).then(r => {
+                results.push({ attempt: i + 1, status: r.status });
+            }).catch(() => results.push({ attempt: i + 1, status: 0, error: 'connection' }))
+        );
     }
+    await Promise.all(promises);
 
-    outOfStockProduct.stock = originalStock;
-    stockByProduct.set({ product: outOfStockProduct.name }, originalStock);
-    logger.info('Simulação estoque esgotado concluída', { action: 'simulation_stock_out_end', attempts: 10, product: outOfStockProduct.name });
-    res.json({ message: `Simulação concluída: 10 tentativas de comprar "${outOfStockProduct.name}" com estoque zerado`, results });
+    // Restaurar 5 unidades de estoque
+    await internalRequest('PUT', `/products/${productId}`, { stock: 5 });
+
+    const errors400 = results.filter(r => r.status >= 400).length;
+    logger.info('Simulacao estoque esgotado concluida', { action: 'simulation_stock_out_end', attempts: 10, errors400, productId });
+    res.json({ message: '10 tentativas de comprar produto zerado (via HTTP)', total: 10, erros400: errors400 });
 });
 
+// Simula 5 tentativas de pagamento (15% falha cada)
 app.post('/simular/falha-pagamento', async (req, res) => {
-    logger.info('Simulação falha de pagamento iniciada', { action: 'simulation_payment_failure_start' });
-
-    // Criar pedido de teste
-    const product = products.find(p => p.stock > 2) || products[0];
-    const order = {
-        id: currentId++,
-        userId: 997,
-        items: [{
-            productId: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: 1,
-            subtotal: product.price
-        }],
-        totalValue: product.price,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-    };
-    orders.push(order);
-    ordersTotal.inc({ status: 'pending' });
-
-    // Tentar pagar 5x (a lógica normal tem 15% falha, então estatisticamente teremos falhas)
+    logger.info('Simulacao falha de pagamento iniciada', { action: 'simulation_payment_failure_start' });
     const payResults = [];
+
+    // Criar usuario e preparar pedido
+    const reg = await internalRequest('POST', '/register', { username: `payfail_${Date.now()}`, password: 'test123456' });
+    const token = reg.data?.token;
+    const catalog = await internalRequest('GET', '/products');
+    const prodId = (catalog.data || [])[0]?.id || 1;
+
     for (let i = 0; i < 5; i++) {
-        // Recriar pedido se já foi pago/cancelado
-        if (order.status !== 'pending') {
-            order.id = currentId++;
-            order.status = 'pending';
-            orders.push(order);
-            ordersTotal.inc({ status: 'pending' });
+        // Adicionar ao carrinho
+        await internalRequest('POST', '/cart', { productId: prodId, quantity: 1 }, token);
+        // Checkout
+        const checkout = await internalRequest('POST', '/checkout', null, token);
+        if (checkout.status === 201 && checkout.data?.orderId) {
+            // Pagar
+            const pay = await internalRequest('POST', `/orders/${checkout.data.orderId}/pay`, null, token);
+            payResults.push({ attempt: i + 1, status: pay.status, success: pay.status === 200 });
+        } else {
+            payResults.push({ attempt: i + 1, error: 'checkout_failed', status: checkout.status });
         }
-        const success = Math.random() > 0.15;
-        order.status = success ? 'paid' : 'cancelled';
-        ordersTotal.inc({ status: order.status });
-        paymentsTotal.inc({ status: success ? 'success' : 'failure' });
-        if (success) revenueTotal.inc(order.totalValue);
-        payResults.push({ attempt: i + 1, success, status: order.status });
     }
 
-    logger.info('Simulação falha de pagamento concluída', { action: 'simulation_payment_failure_end', results: payResults });
-    res.json({ message: '5 tentativas de pagamento simuladas', results: payResults });
+    const sucessos = payResults.filter(r => r.success).length;
+    const falhas = payResults.filter(r => !r.success).length;
+    logger.info('Simulacao falha de pagamento concluida', { action: 'simulation_payment_failure_end', sucessos, falhas });
+    res.json({ message: '5 tentativas de pagamento simuladas (via HTTP)', sucessos, falhas, results: payResults });
 });
 
+// Simula fluxo completo: registro -> catalogo -> carrinho -> checkout -> pagamento
 app.post('/simular/fluxo-completo', async (req, res) => {
-    logger.info('Simulação fluxo completo iniciada', { action: 'simulation_flow_start' });
-    const flow = [];
+    logger.info('Simulacao fluxo completo iniciada', { action: 'simulation_flow_start' });
+    const log = [];
 
     try {
-        // 1. Registrar usuário
-        const testUser = `cliente_${Date.now()}`;
-        const hashedPassword = await bcrypt.hash('teste123', SALT_ROUNDS);
-        const token = require('crypto').randomBytes(32).toString('hex');
-        const user = { id: currentId++, username: testUser, password: hashedPassword, token };
-        users.push(user);
-        registrationsTotal.inc();
-        activeUsersGauge.inc();
-        flow.push({ step: 'registro', username: testUser, userId: user.id });
+        // 1. Registrar usuario
+        const username = `cliente_${Date.now()}`;
+        const reg = await internalRequest('POST', '/register', { username, password: 'teste123456' });
+        log.push({ etapa: 'registro', status: reg.status, username });
 
-        // 2. Buscar catálogo
-        const availableProducts = products.filter(p => p.stock > 0);
-        flow.push({ step: 'catalogo', produtosDisponiveis: availableProducts.length });
+        const token = reg.data?.token;
+        if (!token) throw new Error('Falha no registro');
 
-        // 3. Adicionar 3 itens ao carrinho
-        const cart = getCart(user.id);
-        const selected = availableProducts.slice(0, 3);
-        for (const p of selected) {
-            cart.push({ productId: p.id, quantity: 1 });
-            cartItemsTotal.inc();
+        // 2. Buscar catalogo
+        const catalog = await internalRequest('GET', '/products');
+        log.push({ etapa: 'catalogo', status: catalog.status, produtos: (catalog.data || []).length });
+
+        // 3. Adicionar 2 itens ao carrinho
+        const prods = (catalog.data || []).slice(0, 2);
+        for (const p of prods) {
+            const cartRes = await internalRequest('POST', '/cart', { productId: p.id, quantity: 1 }, token);
+            log.push({ etapa: 'carrinho_add', status: cartRes.status, produto: p.name });
         }
-        flow.push({ step: 'carrinho', itens: selected.map(p => p.name) });
 
         // 4. Checkout
-        const orderItems = cart.map(item => {
-            const p = products.find(pr => pr.id === item.productId);
-            p.stock -= item.quantity;
-            stockByProduct.set({ product: p.name }, p.stock);
-            return { productId: p.id, name: p.name, price: p.price, quantity: item.quantity, subtotal: p.price * item.quantity };
-        });
-        const totalValue = orderItems.reduce((s, i) => s + i.subtotal, 0);
-        const order = {
-            id: currentId++,
-            userId: user.id,
-            items: orderItems,
-            totalValue,
-            status: 'pending',
-            createdAt: new Date().toISOString()
-        };
-        orders.push(order);
-        ordersTotal.inc({ status: 'pending' });
-        checkoutsTotal.inc();
-        carts[user.id] = [];
-        flow.push({ step: 'checkout', orderId: order.id, totalValue });
+        const checkout = await internalRequest('POST', '/checkout', null, token);
+        log.push({ etapa: 'checkout', status: checkout.status, orderId: checkout.data?.orderId });
 
-        // 5. Pagar
-        const paySuccess = Math.random() > 0.15;
-        order.status = paySuccess ? 'paid' : 'cancelled';
-        ordersTotal.inc({ status: order.status });
-        paymentsTotal.inc({ status: paySuccess ? 'success' : 'failure' });
-        if (paySuccess) revenueTotal.inc(order.totalValue);
-        flow.push({ step: 'pagamento', status: order.status, success: paySuccess });
+        // 5. Pagamento
+        let pagtoStatus = 0;
+        if (checkout.data?.orderId) {
+            const pagto = await internalRequest('POST', `/orders/${checkout.data.orderId}/pay`, null, token);
+            pagtoStatus = pagto.status;
+            log.push({ etapa: 'pagamento', status: pagtoStatus, aprovado: pagtoStatus === 200 });
+        }
 
-        logger.info('Simulação fluxo completo concluída', { action: 'simulation_flow_end', userId: user.id, orderId: order.id, paymentStatus: order.status });
-        res.json({ message: 'Fluxo completo simulado!', flow });
+        logger.info('Simulacao fluxo completo concluida', { action: 'simulation_flow_end', etapas: log.length });
+        res.json({ message: 'Fluxo completo simulado via HTTP!', log });
     } catch (err) {
-        logger.error('Erro na simulação de fluxo completo', { error: err.message, action: 'simulation_flow_error' });
-        res.status(500).json({ error: 'Erro na simulação', flow });
+        logger.error('Erro na simulacao de fluxo completo', { error: err.message, action: 'simulation_flow_error' });
+        res.status(500).json({ error: 'Erro na simulacao', log });
     }
 });
 
