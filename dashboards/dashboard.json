@@ -125,6 +125,65 @@
         "targets": [{"refId": "A", "expr": "up{job=~\"node-app|prometheus|node-exporter\"}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
         "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]}, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}}]}},
         "options": {"colorMode": "background", "graphMode": "none", "textMode": "auto", "reduceOptions": {"values": true, "calcs": ["lastNotNull"], "fields": "/^{{job}}$/"}}
+      },
+
+      {
+        "id": 16, "title": "Receita Total (R$)", "type": "stat",
+        "gridPos": {"x": 0, "y": 32, "w": 6, "h": 4},
+        "targets": [{"refId": "A", "expr": "app_revenue_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "currencyBRL", "color": {"mode": "fixed", "fixedColor": "green"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}]}}},
+        "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
+      },
+      {
+        "id": 17, "title": "Pedidos por Status", "type": "barchart",
+        "gridPos": {"x": 6, "y": 32, "w": 9, "h": 7},
+        "targets": [{"refId": "A", "expr": "app_orders_total", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "custom": {"fillOpacity": 80, "drawStyle": "bars"}, "thresholds": {"mode": "absolute", "steps": [
+          {"value": null, "color": "text"},
+          {"value": 0, "color": "yellow"}
+        ]}, "mappings": [], "overrides": [
+          {"matcher": {"id": "byName", "options": "pending"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]},
+          {"matcher": {"id": "byName", "options": "paid"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "cancelled"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "shipped"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]},
+          {"matcher": {"id": "byName", "options": "delivered"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}]}
+        ]}},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "orientation": "vertical"}
+      },
+      {
+        "id": 18, "title": "Pagamentos: Sucesso vs Falha", "type": "piechart",
+        "gridPos": {"x": 15, "y": 32, "w": 4, "h": 7},
+        "targets": [{"refId": "A", "expr": "sum(app_payments_total) by (status)", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}]}}, "overrides": [
+          {"matcher": {"id": "byName", "options": "success"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "failure"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+          {"matcher": {"id": "byName", "options": "error"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
+        ]},
+        "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "pie", "displayLabels": ["percent"], "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
+      },
+      {
+        "id": 19, "title": "Itens no Carrinho", "type": "gauge",
+        "gridPos": {"x": 19, "y": 32, "w": 5, "h": 7},
+        "targets": [{"refId": "A", "expr": "app_cart_items_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}, {"value": 5, "color": "yellow"}, {"value": 15, "color": "orange"}, {"value": 25, "color": "red"}]}}},
+        "options": {"orientation": "auto", "showThresholdLabels": true, "showThresholdMarkers": true, "reduceOptions": {"values": true, "calcs": ["lastNotNull"]}}
+      },
+      {
+        "id": 20, "title": "Total de Checkouts", "type": "stat",
+        "gridPos": {"x": 0, "y": 36, "w": 8, "h": 4},
+        "targets": [{"refId": "A", "expr": "app_checkouts_total", "legendFormat": "Conversao", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "purple"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}]}}},
+        "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
+      },
+      {
+        "id": 21, "title": "Estoque Baixo (< 5 unidades)", "type": "table",
+        "gridPos": {"x": 8, "y": 36, "w": 16, "h": 7},
+        "targets": [{"refId": "A", "expr": "app_stock_total < 5", "legendFormat": "{{product}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true, "format": "table"}],
+        "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "center"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 0, "color": "red"}, {"value": 3, "color": "orange"}]}}, "overrides": [
+          {"matcher": {"id": "byName", "options": "product"}, "properties": [{"id": "displayName", "value": "Produto"}, {"id": "custom.width", "value": 200}]},
+          {"matcher": {"id": "byName", "options": "Value"}, "properties": [{"id": "displayName", "value": "Estoque"}, {"id": "unit", "value": "none"}]}
+        ]},
+        "options": {"showHeader": true, "sortBy": [{"displayName": "Estoque", "desc": false}]}
       }
     ]
   },
