@@ -157,6 +157,7 @@ th { color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; }
 .incident-card.error .icon { color: var(--danger); }
 .incident-card.cpu .icon { color: var(--warning); }
 .incident-card.delay .icon { color: var(--info); }
+.incident-card.ecommerce .icon { color: var(--accent); }
 
 /* Log Box */
 .log-box {

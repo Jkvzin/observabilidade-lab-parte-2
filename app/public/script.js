@@ -251,6 +251,68 @@ async function triggerIncident(type) {
     updateStats();
 }
 
+// ==================== ECOMMERCE SIMULATIONS ====================
+
+async function simularEcommerce(tipo) {
+    const logBox = document.getElementById('ecommerce-log');
+    const nomes = {
+        'black-friday': 'Black Friday',
+        'estoque-esgotado': 'Estoque Esgotado',
+        'falha-pagamento': 'Falha de Pagamento',
+        'fluxo-completo': 'Fluxo Completo'
+    };
+    const nome = nomes[tipo] || tipo;
+
+    logBox.innerHTML = `<p style="color:var(--accent)">Executando simulacao: ${nome}...</p>`;
+    showToast(`Disparando ${nome}...`, 'info');
+
+    try {
+        const res = await fetch(`/simular/${tipo}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            logBox.innerHTML += `<p style="color:var(--success)">${data.message || 'Simulacao concluida'}</p>`;
+            // Exibe resumo numerico (results como objeto)
+            if (data.results && !Array.isArray(data.results)) {
+                for (const [key, val] of Object.entries(data.results)) {
+                    const color = key === 'errors' ? 'var(--danger)' : 'var(--success)';
+                    logBox.innerHTML += `<p>${key}: <span style="color:${color}">${val}</span></p>`;
+                }
+            }
+            // Exibe lista de tentativas (results como array)
+            if (Array.isArray(data.results) && data.results.length > 0) {
+                if (data.results[0].success !== undefined) {
+                    const s = data.results.filter(r => r.success).length;
+                    const f = data.results.filter(r => !r.success).length;
+                    logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${s}</span> | Falhas: <span style="color:var(--danger)">${f}</span></p>`;
+                }
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Tentativas:</strong></p>';
+                data.results.slice(0, 10).forEach(r => {
+                    const ok = r.success !== false;
+                    logBox.innerHTML += `<p style="color:${ok ? 'var(--success)' : 'var(--danger)'}">  → #${r.attempt}: ${r.status || r.error || 'OK'}</p>`;
+                });
+            }
+            // Exibe fluxo (fluxo-completo)
+            if (data.flow) {
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Fluxo:</strong></p>';
+                data.flow.forEach(step => {
+                    logBox.innerHTML += `<p style="color:var(--success)">  → ${step.step}: ${step.status || step.username || step.orderId || JSON.stringify(step)}</p>`;
+                });
+            }
+            showToast(`${nome} concluida!`, 'success');
+        } else {
+            logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${data.error || 'Falha na simulacao'}</p>`;
+            showToast(data.error || 'Erro na simulacao', 'error');
+        }
+    } catch (err) {
+        logBox.innerHTML += `<p style="color:var(--danger)">Erro de conexao: ${err.message}</p>`;
+        showToast('Erro de conexao com a API', 'error');
+    }
+
+    logBox.scrollTop = logBox.scrollHeight;
+    updateStats();
+}
+
 // ==================== BRUTE FORCE SIMULATION ====================
 
 async function simulateBruteForce() {

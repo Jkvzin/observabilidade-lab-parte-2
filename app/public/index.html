@@ -151,6 +151,39 @@
                     </div>
                 </section>
 
+                <!-- Simulações Ecommerce -->
+                <section class="glass-panel incidents-section">
+                    <h2>Simulacoes Ecommerce</h2>
+                    <p>Cenarios de negocio para observabilidade.</p>
+                    <div class="incident-cards">
+                        <div class="incident-card ecommerce">
+                            <div class="icon">BF</div>
+                            <h3>Black Friday</h3>
+                            <p>50 req. paralelas (pico)</p>
+                            <button onclick="simularEcommerce('black-friday')" class="btn-danger">Disparar</button>
+                        </div>
+                        <div class="incident-card ecommerce">
+                            <div class="icon">ES</div>
+                            <h3>Estoque Esgotado</h3>
+                            <p>10x compra sem estoque</p>
+                            <button onclick="simularEcommerce('estoque-esgotado')" class="btn-warning">Disparar</button>
+                        </div>
+                        <div class="incident-card ecommerce">
+                            <div class="icon">PG</div>
+                            <h3>Falha Pagamento</h3>
+                            <p>5x tentativas de pagar</p>
+                            <button onclick="simularEcommerce('falha-pagamento')" class="btn-info">Disparar</button>
+                        </div>
+                        <div class="incident-card ecommerce">
+                            <div class="icon">FC</div>
+                            <h3>Fluxo Completo</h3>
+                            <p>Registro → Compra</p>
+                            <button onclick="simularEcommerce('fluxo-completo')" class="btn-success">Disparar</button>
+                        </div>
+                    </div>
+                    <div id="ecommerce-log" class="log-box"></div>
+                </section>
+
                 <!-- Brute Force Test -->
                 <section class="glass-panel incidents-section">
                     <h2>Teste de Seguranca</h2>
