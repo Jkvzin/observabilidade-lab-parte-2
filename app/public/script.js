@@ -1,6 +1,7 @@
 let isLoginMode = true;
 let currentUser = null;
 let currentUserId = null;
+let authToken = null;
 const SESSION_KEY = 'o11ylab_session';
 const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
@@ -8,9 +9,10 @@ const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 (function restoreSession() {
     try {
         const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
-        if (saved && saved.username && saved.userId && saved.expiresAt && Date.now() < saved.expiresAt) {
+        if (saved && saved.username && saved.userId && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
             currentUser = saved.username;
             currentUserId = saved.userId;
+            authToken = saved.token;
             showStore();
         }
     } catch (e) { localStorage.removeItem(SESSION_KEY); }
@@ -26,6 +28,11 @@ const authSubmitBtn = document.getElementById('auth-submit-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const currentUserDisplay = document.getElementById('current-user-display');
 const toastContainer = document.getElementById('toast-container');
+
+// Auth header helper
+function authHeaders() {
+    return authToken ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` } : { 'Content-Type': 'application/json' };
+}
 
 // Tabs auth
 tabLogin.addEventListener('click', () => { isLoginMode = true; tabLogin.classList.add('active'); tabRegister.classList.remove('active'); authSubmitBtn.innerText = 'Entrar na Loja'; });
@@ -44,7 +51,8 @@ authForm.addEventListener('submit', async (e) => {
             if (isLoginMode) {
                 currentUser = data.username || username;
                 currentUserId = data.userId;
-                localStorage.setItem(SESSION_KEY, JSON.stringify({ username: currentUser, userId: currentUserId, expiresAt: Date.now() + SESSION_EXPIRY_MS }));
+                authToken = data.token;
+                localStorage.setItem(SESSION_KEY, JSON.stringify({ username: currentUser, userId: currentUserId, token: authToken, expiresAt: Date.now() + SESSION_EXPIRY_MS }));
                 showStore();
                 showToast('Login efetuado!', 'success');
             } else {
@@ -66,7 +74,7 @@ function showStore() {
 }
 
 logoutBtn.addEventListener('click', () => {
-    currentUser = null; currentUserId = null; localStorage.removeItem(SESSION_KEY);
+    currentUser = null; currentUserId = null; authToken = null; localStorage.removeItem(SESSION_KEY);
     storeView.classList.remove('active');
     setTimeout(() => { storeView.style.display = 'none'; loginView.style.display = 'flex'; setTimeout(() => loginView.classList.add('active'), 50); }, 400);
     document.getElementById('username').value = ''; document.getElementById('password').value = '';
@@ -92,62 +100,63 @@ function switchTab(tabName) {
 
 async function loadCatalogo() {
     try {
-        const res = await fetch('/api/produtos');
+        const res = await fetch('/products');
         const produtos = await res.json();
         const grid = document.getElementById('catalog-grid');
         grid.innerHTML = produtos.map(p => `
             <div class="product-card glass-panel">
-                <div class="product-image">${p.imagem || '📦'}</div>
+                <div class="product-image">📦</div>
                 <div class="product-info">
-                    <span class="product-category">${p.categoria || ''}</span>
-                    <h3>${escapeHtml(p.nome)}</h3>
-                    <div class="product-price">R$ ${p.preco.toFixed(2)}</div>
-                    <div class="product-stock ${p.estoque === 0 ? 'out' : p.estoque < 5 ? 'low' : ''}">
-                        ${p.estoque === 0 ? 'Esgotado' : `Em estoque: ${p.estoque}`}
+                    <span class="product-category">${p.category || ''}</span>
+                    <h3>${escapeHtml(p.name)}</h3>
+                    <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+                    <div class="product-stock ${p.stock === 0 ? 'out' : p.stock < 5 ? 'low' : ''}">
+                        ${p.stock === 0 ? 'Esgotado' : `Em estoque: ${p.stock}`}
                     </div>
                 </div>
-                <button class="btn-primary btn-add-cart" ${p.estoque === 0 ? 'disabled' : ''}
+                <button class="btn-primary btn-add-cart" ${p.stock === 0 ? 'disabled' : ''}
                     onclick="addToCart(${p.id})">
-                    ${p.estoque === 0 ? 'Indisponivel' : 'Adicionar ao Carrinho'}
+                    ${p.stock === 0 ? 'Indisponivel' : 'Adicionar ao Carrinho'}
                 </button>
             </div>
         `).join('');
     } catch (err) { showToast('Erro ao carregar catalogo', 'error'); }
 }
 
-// Busca
+// Busca (usa query param category no PR #27, adaptado para busca textual)
 document.getElementById('search-input').addEventListener('input', async function() {
-    const q = this.value.trim();
+    const q = this.value.trim().toLowerCase();
     try {
-        const res = await fetch(`/api/produtos${q ? '?q=' + encodeURIComponent(q) : ''}`);
+        const res = await fetch('/products');
         const produtos = await res.json();
+        const filtered = q ? produtos.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q)) : produtos;
         const grid = document.getElementById('catalog-grid');
-        grid.innerHTML = produtos.map(p => `
+        grid.innerHTML = filtered.map(p => `
             <div class="product-card glass-panel">
-                <div class="product-image">${p.imagem || '📦'}</div>
+                <div class="product-image">📦</div>
                 <div class="product-info">
-                    <span class="product-category">${p.categoria || ''}</span>
-                    <h3>${escapeHtml(p.nome)}</h3>
-                    <div class="product-price">R$ ${p.preco.toFixed(2)}</div>
-                    <div class="product-stock ${p.estoque === 0 ? 'out' : p.estoque < 5 ? 'low' : ''}">
-                        ${p.estoque === 0 ? 'Esgotado' : `Em estoque: ${p.estoque}`}
+                    <span class="product-category">${p.category || ''}</span>
+                    <h3>${escapeHtml(p.name)}</h3>
+                    <div class="product-price">R$ ${p.price.toFixed(2)}</div>
+                    <div class="product-stock ${p.stock === 0 ? 'out' : p.stock < 5 ? 'low' : ''}">
+                        ${p.stock === 0 ? 'Esgotado' : `Em estoque: ${p.stock}`}
                     </div>
                 </div>
-                <button class="btn-primary btn-add-cart" ${p.estoque === 0 ? 'disabled' : ''}
+                <button class="btn-primary btn-add-cart" ${p.stock === 0 ? 'disabled' : ''}
                     onclick="addToCart(${p.id})">
-                    ${p.estoque === 0 ? 'Indisponivel' : 'Adicionar ao Carrinho'}
+                    ${p.stock === 0 ? 'Indisponivel' : 'Adicionar ao Carrinho'}
                 </button>
             </div>
         `).join('');
     } catch (err) { /* silencioso */ }
 });
 
-async function addToCart(produtoId) {
+async function addToCart(productId) {
     try {
-        const res = await fetch('/api/carrinho', {
+        const res = await fetch('/cart', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: String(currentUserId), produtoId, quantidade: 1 })
+            headers: authHeaders(),
+            body: JSON.stringify({ productId, quantity: 1 })
         });
         const data = await res.json();
         if (res.ok) {
@@ -163,7 +172,7 @@ async function addToCart(produtoId) {
 
 async function loadCarrinho() {
     try {
-        const res = await fetch(`/api/carrinho/${currentUserId}`);
+        const res = await fetch('/cart', { headers: authHeaders() });
         const cart = await res.json();
         const items = cart.items || [];
         const cartItems = document.getElementById('cart-items');
@@ -172,7 +181,7 @@ async function loadCarrinho() {
         const badge = document.getElementById('cart-badge');
         const tabCount = document.getElementById('tab-cart-count');
 
-        const totalItems = items.reduce((s, i) => s + i.quantidade, 0);
+        const totalItems = items.reduce((s, i) => s + i.quantity, 0);
         if (totalItems > 0) {
             badge.style.display = 'inline'; badge.innerText = totalItems;
             tabCount.innerText = `(${totalItems})`;
@@ -194,23 +203,23 @@ async function loadCarrinho() {
 
         cartItems.innerHTML = items.map(item => `
             <div class="cart-item glass-panel">
-                <div class="cart-item-img">${item.imagem || '📦'}</div>
+                <div class="cart-item-img">📦</div>
                 <div class="cart-item-info">
-                    <strong>${escapeHtml(item.nome)}</strong>
-                    <span>R$ ${item.preco.toFixed(2)} x ${item.quantidade}</span>
-                    <span class="cart-item-subtotal">Subtotal: R$ ${(item.preco * item.quantidade).toFixed(2)}</span>
+                    <strong>${escapeHtml(item.name)}</strong>
+                    <span>R$ ${item.price.toFixed(2)} x ${item.quantity}</span>
+                    <span class="cart-item-subtotal">Subtotal: R$ ${(item.subtotal || item.price * item.quantity).toFixed(2)}</span>
                 </div>
                 <div class="cart-item-actions">
-                    <button class="btn-sm btn-danger" onclick="removerDoCarrinho(${item.produtoId})" title="Remover">✕</button>
+                    <button class="btn-sm btn-danger" onclick="removerDoCarrinho(${item.productId})" title="Remover">✕</button>
                 </div>
             </div>
         `).join('');
     } catch (err) { /* silencioso */ }
 }
 
-async function removerDoCarrinho(produtoId) {
+async function removerDoCarrinho(productId) {
     try {
-        await fetch(`/api/carrinho/${currentUserId}/${produtoId}`, { method: 'DELETE' });
+        await fetch(`/cart/${productId}`, { method: 'DELETE', headers: authHeaders() });
         showToast('Item removido', 'info');
         loadCarrinho();
     } catch (err) { showToast('Erro ao remover', 'error'); }
@@ -218,18 +227,16 @@ async function removerDoCarrinho(produtoId) {
 
 async function finalizarCompra() {
     try {
-        const res = await fetch('/api/checkout', {
+        const res = await fetch('/checkout', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: String(currentUserId) })
+            headers: authHeaders()
         });
         const data = await res.json();
         if (res.ok) {
-            const pedido = data.pedido;
-            showToast(`Pedido #${pedido.id} criado! Total: R$ ${pedido.total.toFixed(2)}`, 'success');
+            showToast(`Pedido #${data.orderId} criado! Total: R$ ${data.totalValue ? data.totalValue.toFixed(2) : '?'}`, 'success');
             loadCarrinho();
             loadPedidos();
-            loadCatalogo(); // atualiza estoque
+            loadCatalogo();
         } else {
             showToast(data.error || 'Erro no checkout', 'error');
         }
@@ -240,30 +247,30 @@ async function finalizarCompra() {
 
 async function loadPedidos() {
     try {
-        const res = await fetch(`/api/pedidos?userId=${currentUserId}`);
+        const res = await fetch('/orders', { headers: authHeaders() });
         const pedidos = await res.json();
         const list = document.getElementById('pedidos-list');
         const empty = document.getElementById('pedidos-empty');
 
-        if (pedidos.length === 0) {
+        if (!Array.isArray(pedidos) || pedidos.length === 0) {
             list.innerHTML = ''; empty.style.display = 'block'; return;
         }
         empty.style.display = 'none';
 
-        const statusLabels = { pendente: '⏳ Pendente', pago: '✅ Pago', pagamento_falhou: '❌ Falhou', enviado: '🚚 Enviado', entregue: '📬 Entregue', cancelado: '🗑️ Cancelado' };
-        const statusColors = { pendente: 'status-yellow', pago: 'status-green', pagamento_falhou: 'status-red', enviado: 'status-blue', entregue: 'status-purple', cancelado: 'status-red' };
+        const statusLabels = { pending: '⏳ Pendente', paid: '✅ Pago', cancelled: '🗑️ Cancelado' };
+        const statusColors = { pending: 'status-yellow', paid: 'status-green', cancelled: 'status-red' };
 
-        list.innerHTML = pedidos.reverse().map(p => `
+        list.innerHTML = [...pedidos].reverse().map(p => `
             <div class="pedido-card glass-panel">
                 <div class="pedido-header">
                     <span class="pedido-id">Pedido #${p.id}</span>
                     <span class="pedido-status badge ${statusColors[p.status] || ''}">${statusLabels[p.status] || p.status}</span>
-                    <span class="pedido-date">${new Date(p.criadoEm).toLocaleString('pt-BR')}</span>
+                    <span class="pedido-date">${new Date(p.createdAt).toLocaleString('pt-BR')}</span>
                 </div>
                 <div class="pedido-items">
-                    ${p.itens.map(i => `<span class="pedido-item">${i.quantidade}x ${escapeHtml(i.nome)}</span>`).join('')}
+                    ${(p.items || []).map(i => `<span class="pedido-item">${i.quantity}x ${escapeHtml(i.name)}</span>`).join('')}
                 </div>
-                <div class="pedido-total">Total: <strong>R$ ${p.total.toFixed(2)}</strong></div>
+                <div class="pedido-total">Total: <strong>R$ ${(p.totalValue || 0).toFixed(2)}</strong></div>
             </div>
         `).join('');
     } catch (err) { /* silencioso */ }
@@ -291,10 +298,28 @@ async function simularEcommerce(tipo) {
         const data = await res.json();
         if (res.ok) {
             logBox.innerHTML += `<p style="color:var(--success)">${data.message}</p>`;
-            if (data.total) logBox.innerHTML += `<p>Req: ${data.total} | Erros: <span style="color:var(--danger)">${data.erros || 0}</span></p>`;
-            if (data.erros400 !== undefined) logBox.innerHTML += `<p>Erros 400: ${data.erros400}</p>`;
-            if (data.sucessos !== undefined) logBox.innerHTML += `<p>Sucessos: ${data.sucessos} | Falhas: ${data.falhas}</p>`;
-            if (data.log) data.log.forEach(e => logBox.innerHTML += `<p style="color:${e.status >= 400 ? 'var(--danger)' : 'var(--success)'}">→ ${e.etapa}: ${e.status}${e.ok !== undefined ? (e.ok ? ' ✓' : ' ✗') : ''}</p>`);
+            if (data.results && !Array.isArray(data.results)) {
+                for (const [key, val] of Object.entries(data.results)) {
+                    logBox.innerHTML += `<p>${key}: <span style="color:${key === 'errors' ? 'var(--danger)' : 'var(--success)'}">${val}</span></p>`;
+                }
+            }
+            if (Array.isArray(data.results) && data.results.length > 0) {
+                if (data.results[0].success !== undefined) {
+                    const s = data.results.filter(r => r.success).length;
+                    const f = data.results.filter(r => !r.success).length;
+                    logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${s}</span> | Falhas: <span style="color:var(--danger)">${f}</span></p>`;
+                }
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Tentativas:</strong></p>';
+                data.results.slice(0, 10).forEach(r => {
+                    logBox.innerHTML += `<p style="color:${r.success !== false ? 'var(--success)' : 'var(--danger)'}">  → #${r.attempt}: ${r.status || r.error || 'OK'}</p>`;
+                });
+            }
+            if (data.flow) {
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Fluxo:</strong></p>';
+                data.flow.forEach(step => {
+                    logBox.innerHTML += `<p style="color:var(--success)">  → ${step.step || '?'}: ${step.status || step.username || step.orderId || ''}</p>`;
+                });
+            }
             showToast(`${nome} concluida!`, 'success');
         } else { logBox.innerHTML += `<p style="color:var(--danger)">${data.error}</p>`; }
     } catch (err) { logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${err.message}</p>`; }
