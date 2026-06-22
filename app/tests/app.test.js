@@ -146,6 +146,61 @@ describe('API TechStore - Ecommerce', () => {
         });
     });
 
+    describe('PUT /products/:id', () => {
+        test('deve atualizar produto existente (200)', async () => {
+            const catalog = await request(app).get('/products');
+            const target = catalog.body[0];
+            const res = await request(app)
+                .put(`/products/${target.id}`)
+                .send({ name: 'Produto Atualizado', price: 149.90 });
+            expect(res.statusCode).toBe(200);
+            expect(res.body.name).toBe('Produto Atualizado');
+            expect(res.body.price).toBe(149.90);
+        });
+
+        test('deve retornar 404 para produto inexistente', async () => {
+            const res = await request(app)
+                .put('/products/99999')
+                .send({ name: 'Nao existe' });
+            expect(res.statusCode).toBe(404);
+        });
+
+        test('deve rejeitar body vazio (400)', async () => {
+            const catalog = await request(app).get('/products');
+            const target = catalog.body[0];
+            const res = await request(app)
+                .put(`/products/${target.id}`)
+                .send({});
+            expect(res.statusCode).toBe(400);
+        });
+    });
+
+    describe('DELETE /products/:id', () => {
+        test('deve deletar produto existente (204)', async () => {
+            const res = await request(app)
+                .post('/products')
+                .send({ name: 'Para Deletar', price: 10, category: 'Teste', stock: 5 });
+            const id = res.body.id;
+            const delRes = await request(app).delete(`/products/${id}`);
+            expect(delRes.statusCode).toBe(204);
+        });
+
+        test('deve retornar 404 para produto inexistente', async () => {
+            const res = await request(app).delete('/products/99999');
+            expect(res.statusCode).toBe(404);
+        });
+
+        test('deve retornar 404 ao deletar o mesmo ID novamente', async () => {
+            const createRes = await request(app)
+                .post('/products')
+                .send({ name: 'Para Deletar 2', price: 10, category: 'Teste', stock: 5 });
+            const id = createRes.body.id;
+            await request(app).delete(`/products/${id}`);
+            const res = await request(app).delete(`/products/${id}`);
+            expect(res.statusCode).toBe(404);
+        });
+    });
+
     // ==================== CARRINHO + CHECKOUT (usuario unico) ====================
     describe('Fluxo Ecommerce (carrinho + checkout + pagamento)', () => {
         let token;

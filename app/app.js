@@ -343,6 +343,51 @@ app.post('/products', (req, res) => {
     res.status(201).json(product);
 });
 
+app.put('/products/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, price, description, category, stock } = req.body;
+    const product = products.find(p => p.id == id);
+    if (!product) {
+        errorsTotal.inc({ type: 'not_found', endpoint: '/products/:id' });
+        logger.warn('Produto nao encontrado para atualizacao', { productId: Number(id), action: 'product_update_failed' });
+        return res.status(404).json({ error: 'Produto nao encontrado' });
+    }
+    if (!name && !price && !category && stock === undefined) {
+        return res.status(400).json({ error: 'Nenhum campo para atualizar. Envie name, price, category, description e/ou stock.' });
+    }
+    const oldStock = product.stock;
+    if (name) product.name = name;
+    if (price !== undefined) product.price = parseFloat(price);
+    if (description !== undefined) product.description = description;
+    if (category) product.category = category;
+    if (stock !== undefined) {
+        product.stock = parseInt(stock);
+        stockByProduct.set({ product: product.name }, product.stock);
+        if (product.stock < 5 && oldStock >= 5) {
+            logger.warn('Alerta de estoque baixo apos atualizacao', { productId: product.id, productName: product.name, currentStock: product.stock, threshold: 5, action: 'low_stock_alert' });
+        }
+    }
+    logger.info('Produto atualizado', { productId: product.id, productName: product.name, price: product.price, category: product.category, stock: product.stock, action: 'product_updated' });
+    res.json(product);
+});
+
+app.delete('/products/:id', (req, res) => {
+    const { id } = req.params;
+    const index = products.findIndex(p => p.id == id);
+    if (index !== -1) {
+        const removed = products[index];
+        products.splice(index, 1);
+        productsTotal.dec();
+        stockByProduct.remove({ product: removed.name });
+        logger.info('Produto removido', { productId: Number(id), productName: removed.name, action: 'product_deleted' });
+        res.status(204).send();
+    } else {
+        errorsTotal.inc({ type: 'not_found', endpoint: '/products/:id' });
+        logger.warn('Produto nao encontrado para remocao', { productId: Number(id), action: 'product_delete_failed' });
+        res.status(404).json({ error: 'Produto nao encontrado' });
+    }
+});
+
 // ==================== CARRINHO ====================
 app.get('/cart', (req, res) => {
     const userId = getUserIdFromAuth(req);
