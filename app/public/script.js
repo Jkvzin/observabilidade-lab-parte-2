@@ -251,6 +251,53 @@ async function triggerIncident(type) {
     updateStats();
 }
 
+// ==================== ECOMMERCE SIMULATIONS ====================
+
+async function simularEcommerce(tipo) {
+    const logBox = document.getElementById('ecommerce-log');
+    const nomes = {
+        'black-friday': 'Black Friday',
+        'estoque-esgotado': 'Estoque Esgotado',
+        'falha-pagamento': 'Falha de Pagamento',
+        'fluxo-completo': 'Fluxo Completo'
+    };
+    const nome = nomes[tipo] || tipo;
+
+    logBox.innerHTML = `<p style="color:var(--accent)">Executando simulacao: ${nome}...</p>`;
+    showToast(`Disparando ${nome}...`, 'info');
+
+    try {
+        const res = await fetch(`/simular/${tipo}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            logBox.innerHTML += `<p style="color:var(--success)">${data.message || 'Simulacao concluida'}</p>`;
+            if (data.total) logBox.innerHTML += `<p>Total requisicoes: ${data.total}</p>`;
+            if (data.erros !== undefined) logBox.innerHTML += `<p>Erros: <span style="color:var(--danger)">${data.erros}</span></p>`;
+            if (data.erros400 !== undefined) logBox.innerHTML += `<p>Erros 400: <span style="color:var(--danger)">${data.erros400}</span></p>`;
+            if (data.sucessos !== undefined) logBox.innerHTML += `<p>Sucessos: <span style="color:var(--success)">${data.sucessos}</span> | Falhas: <span style="color:var(--danger)">${data.falhas}</span></p>`;
+            if (data.log) {
+                logBox.innerHTML += '<p style="margin-top:0.5rem"><strong>Log do fluxo:</strong></p>';
+                data.log.forEach(entry => {
+                    const statusColor = entry.status >= 400 ? 'var(--danger)' : entry.status >= 200 ? 'var(--success)' : 'var(--text-secondary)';
+                    logBox.innerHTML += `<p style="color:${statusColor}">  → ${entry.etapa}: HTTP ${entry.status}${entry.aprovado !== undefined ? (entry.aprovado ? ' ✓ Pago' : ' ✗ Recusado') : ''}</p>`;
+                });
+            }
+            showToast(`${nome} concluida!`, 'success');
+        } else {
+            logBox.innerHTML += `<p style="color:var(--danger)">Erro: ${data.error || 'Falha na simulacao'}</p>`;
+            showToast(data.error || 'Erro na simulacao', 'error');
+        }
+    } catch (err) {
+        logBox.innerHTML += `<p style="color:var(--danger)">Erro de conexao: ${err.message}</p>`;
+        showToast('Erro de conexao com a API', 'error');
+    }
+
+    // Rola o log para o fim
+    logBox.scrollTop = logBox.scrollHeight;
+    updateStats();
+}
+
 // ==================== BRUTE FORCE SIMULATION ====================
 
 async function simulateBruteForce() {
