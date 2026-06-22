@@ -153,7 +153,7 @@ app.post('/login', loginLimiter, async (req, res) => {
     if (!user) { loginsTotal.inc({ status: 'failure' }); return res.status(401).json({ error: 'Credenciais inválidas' }); }
     try {
         const ok = await bcrypt.compare(password, user.password);
-        if (ok) { loginsTotal.inc({ status: 'success' }); res.json({ message: 'Login OK', userId: user.id, username: user.username }); }
+        if (ok) { loginsTotal.inc({ status: 'success' }); res.json({ message: 'Login efetuado com sucesso', userId: user.id, username: user.username }); }
         else { loginsTotal.inc({ status: 'failure' }); res.status(401).json({ error: 'Credenciais inválidas' }); }
     } catch (e) { res.status(500).json({ error: 'Erro interno' }); }
 });
@@ -161,6 +161,16 @@ app.post('/login', loginLimiter, async (req, res) => {
 // CRUD (mantido)
 app.get('/users', (req, res) => { crudOperationsTotal.inc({ operation: 'read', status: 'success' }); res.json(users.map(u => ({ id: u.id, username: u.username }))); });
 app.get('/users/:id', (req, res) => { const u = users.find(x => x.id == req.params.id); if (u) { crudOperationsTotal.inc({ operation: 'read', status: 'success' }); res.json({ id: u.id, username: u.username }); } else { res.status(404).json({ error: 'Não encontrado' }); } });
+app.put('/users/:id', (req, res) => {
+    const { id } = req.params; const { username, password } = req.body;
+    const user = users.find(u => u.id == id);
+    if (!user) { crudOperationsTotal.inc({ operation: 'update', status: 'error' }); return res.status(404).json({ error: 'Não encontrado' }); }
+    if (!username && !password) { errorsTotal.inc({ type: 'validation', endpoint: '/users/:id' }); return res.status(400).json({ error: 'Nenhum campo para atualizar' }); }
+    if (username) user.username = username;
+    if (password) user.password = password;
+    crudOperationsTotal.inc({ operation: 'update', status: 'success' });
+    res.json({ id: user.id, username: user.username });
+});
 app.delete('/users/:id', (req, res) => {
     const i = users.findIndex(u => u.id == req.params.id);
     if (i !== -1) { users.splice(i, 1); activeUsersGauge.dec(); crudOperationsTotal.inc({ operation: 'delete', status: 'success' }); res.status(204).send(); }
@@ -172,9 +182,9 @@ app.get('/incidente-erro', (req, res) => { logger.error('Incidente erro 500'); r
 app.get('/incidente-cpu', (req, res) => {
     const n = os.cpus().length; let done = 0;
     for (let i = 0; i < n; i++) { const w = new Worker(path.join(__dirname, 'cpu-worker.js')); w.on('exit', () => { if (++done === n) logger.info('CPU pico fim'); }); }
-    res.json({ message: `Pico CPU em ${n} núcleos` });
+    res.json({ message: `Pico de CPU gerado em ${n} núcleos` });
 });
-app.get('/incidente-delay', (req, res) => { setTimeout(() => res.json({ message: 'Delay 10s' }), 10000); });
+app.get('/incidente-delay', (req, res) => { setTimeout(() => res.json({ message: 'Resposta com delay de 10 segundos' }), 10000); });
 
 // ==================== ECOMMERCE API ====================
 
