@@ -1,12 +1,12 @@
 {
   "dashboard": {
-    "title": "TechStore - Observabilidade Completa",
+    "title": "JJ Eletronicos - Observabilidade Completa",
     "uid": "obs-lab-2-full",
     "schemaVersion": 39,
-    "tags": ["ecommerce", "observabilidade", "sre", "techstore"],
+    "tags": ["ecommerce", "observabilidade", "sre", "jj-eletronicos"],
     "timezone": "browser",
     "refresh": "10s",
-    "description": "Dashboard completo TechStore Ecommerce: infraestrutura, HTTP, seguranca, negocios. Metricas em tempo real via Prometheus + Loki.",
+    "description": "Dashboard completo JJ Eletronicos Ecommerce: infraestrutura, HTTP, seguranca, negocios. Metricas em tempo real via Prometheus + Loki.",
     "panels": [
       {
         "id": 1, "title": "CPU App (%)", "type": "timeseries",

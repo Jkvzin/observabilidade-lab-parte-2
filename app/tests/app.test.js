@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../app');
 
-describe('API TechStore - Ecommerce', () => {
+describe('API JJ Eletronicos - Ecommerce', () => {
     // ==================== HEALTH ====================
     describe('GET /', () => {
         test('deve redirecionar para o dashboard HTML (302)', async () => {
