@@ -1,189 +1,203 @@
 {
   "dashboard": {
-    "title": "Observabilidade Lab 2 - Completo",
+    "title": "TechStore - Observabilidade Completa",
     "uid": "obs-lab-2-full",
     "schemaVersion": 39,
-    "tags": ["observabilidade", "sre"],
+    "tags": ["ecommerce", "observabilidade", "sre", "techstore"],
     "timezone": "browser",
     "refresh": "10s",
-    "description": "Dashboard completo com metricas de infra, app, negocio e seguranca. P50=mediana, P95=95 percentil, P99=99 percentil. 2xx=sucesso, 4xx=erro cliente, 5xx=erro servidor.",
+    "description": "Dashboard completo TechStore Ecommerce: infraestrutura, HTTP, seguranca, negocios. Metricas em tempo real via Prometheus + Loki.",
     "panels": [
       {
-        "id": 1, "title": "Uso de CPU (%) - Alerta > 80%", "type": "timeseries",
+        "id": 1, "title": "CPU App (%)", "type": "timeseries",
         "gridPos": {"x": 0, "y": 0, "w": 8, "h": 7},
-        "targets": [{"refId": "A", "expr": "rate(node_app_process_cpu_seconds_total{job=\"node-app\"}[1m]) * 100", "legendFormat": "CPU App", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "percent", "custom": {"fillOpacity": 30, "lineWidth": 2, "drawStyle": "line"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 80, "color": "red"}]}}},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+        "targets": [{"refId": "A", "expr": "rate(node_app_process_cpu_seconds_total{job=\"node-app\"}[1m]) * 100", "legendFormat": "CPU", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "custom": {"fillOpacity": 25, "lineWidth": 2, "drawStyle": "line", "gradientMode": "opacity"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 50, "color": "yellow"}, {"value": 80, "color": "red"}]}}},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
       },
       {
-        "id": 2, "title": "Uso de Memoria (%)", "type": "timeseries",
+        "id": 2, "title": "Memoria (%)", "type": "timeseries",
         "gridPos": {"x": 8, "y": 0, "w": 8, "h": 7},
         "targets": [{"refId": "A", "expr": "100 * (1 - ((avg_over_time(node_memory_MemFree_bytes[1m]) + avg_over_time(node_memory_Cached_bytes[1m]) + avg_over_time(node_memory_Buffers_bytes[1m])) / avg_over_time(node_memory_MemTotal_bytes[1m])))", "legendFormat": "Memoria", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "percent", "custom": {"fillOpacity": 30, "lineWidth": 2, "drawStyle": "line"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 85, "color": "red"}]}}},
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"fillOpacity": 25, "lineWidth": 2, "drawStyle": "line", "gradientMode": "opacity"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 70, "color": "yellow"}, {"value": 85, "color": "red"}]}}},
         "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
       },
       {
-        "id": 3, "title": "Trafego de Rede (Entrada vs Saida)", "type": "timeseries",
+        "id": 3, "title": "Trafego de Rede", "type": "timeseries",
         "gridPos": {"x": 16, "y": 0, "w": 8, "h": 7},
         "targets": [
           {"refId": "A", "expr": "sum(rate(node_network_receive_bytes_total{device!=\"lo\"}[1m]))", "legendFormat": "Download", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
           {"refId": "B", "expr": "sum(rate(node_network_transmit_bytes_total{device!=\"lo\"}[1m]))", "legendFormat": "Upload", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
         ],
-        "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"fillOpacity": 20, "lineWidth": 2, "drawStyle": "line"}}},
+        "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"fillOpacity": 15, "lineWidth": 2, "drawStyle": "line"}}, "overrides": [{"matcher": {"id": "byName", "options": "Download"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]}, {"matcher": {"id": "byName", "options": "Upload"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}]},
         "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
       },
+
       {
-        "id": 4, "title": "Requisicoes por Segundo (RPS) - Por tipo", "type": "barchart",
+        "id": 4, "title": "Requisicoes por Segundo", "type": "barchart",
         "gridPos": {"x": 0, "y": 7, "w": 8, "h": 7},
         "targets": [
-          {"refId": "A", "expr": "sum(rate(http_requests_total{status_code=~\"2..\"}[1m]))", "legendFormat": "2xx Sucesso", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
-          {"refId": "B", "expr": "sum(rate(http_requests_total{status_code=~\"4..\"}[1m]))", "legendFormat": "4xx Erro Cliente", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
-          {"refId": "C", "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m]))", "legendFormat": "5xx Erro Servidor", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
+          {"refId": "A", "expr": "sum(rate(http_requests_total{status_code=~\"2..\"}[1m]))", "legendFormat": "2xx OK", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
+          {"refId": "B", "expr": "sum(rate(http_requests_total{status_code=~\"4..\"}[1m]))", "legendFormat": "4xx Erro", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
+          {"refId": "C", "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m]))", "legendFormat": "5xx Erro", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
         ],
-        "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80, "lineWidth": 0, "drawStyle": "bars"}}},
+        "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 85, "drawStyle": "bars"}}, "overrides": [{"matcher": {"id": "byName", "options": "2xx OK"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}, {"matcher": {"id": "byName", "options": "4xx Erro"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}, {"matcher": {"id": "byName", "options": "5xx Erro"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}]},
         "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "orientation": "vertical"}
       },
       {
-        "id": 5, "title": "Taxa de Erro HTTP (%) - Alerta > 5%", "type": "timeseries",
+        "id": 5, "title": "Taxa de Erro HTTP (%)", "type": "timeseries",
         "gridPos": {"x": 8, "y": 7, "w": 8, "h": 7},
-        "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{status_code=~\"5..|4..\"}[1m])) / sum(rate(http_requests_total[1m])) * 100", "legendFormat": "Taxa de Erro", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "percent", "custom": {"fillOpacity": 50, "lineWidth": 2, "drawStyle": "line"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 10, "color": "red"}]}}},
+        "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{status_code=~\"5..|4..\"}[1m])) / sum(rate(http_requests_total[1m])) * 100", "legendFormat": "Erro %", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "custom": {"fillOpacity": 40, "lineWidth": 2, "drawStyle": "line", "gradientMode": "scheme", "axisColorMode": "series"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 10, "color": "red"}]}}},
         "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
       },
       {
-        "id": 6, "title": "Latencia HTTP - P50 (mediana), P95, P99", "type": "timeseries",
+        "id": 6, "title": "Latencia HTTP (P50, P95, P99)", "type": "timeseries",
         "gridPos": {"x": 16, "y": 7, "w": 8, "h": 7},
         "targets": [
-          {"refId": "A", "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[1m]))", "legendFormat": "P50 (mediana)", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
+          {"refId": "A", "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[1m]))", "legendFormat": "P50", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
           {"refId": "B", "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))", "legendFormat": "P95", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
           {"refId": "C", "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[1m]))", "legendFormat": "P99", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
         ],
-        "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 15, "lineWidth": 2, "drawStyle": "line"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 2, "color": "red"}]}}},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+        "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 10, "lineWidth": 2, "drawStyle": "line"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "yellow"}, {"value": 2, "color": "red"}]}}},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
       },
+
       {
-        "id": 7, "title": "Logins: Sucesso vs Falha (barras)", "type": "barchart",
-        "gridPos": {"x": 0, "y": 14, "w": 8, "h": 7},
+        "id": 7, "title": "Logins (Sucesso vs Falha)", "type": "barchart",
+        "gridPos": {"x": 0, "y": 14, "w": 6, "h": 7},
         "targets": [
           {"refId": "A", "expr": "rate(app_logins_total{status=\"success\"}[1m])", "legendFormat": "Sucesso", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true},
-          {"refId": "B", "expr": "rate(app_logins_total{status=\"failure\"}[1m])", "legendFormat": "Falha (ataque?)", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
+          {"refId": "B", "expr": "rate(app_logins_total{status=\"failure\"}[1m])", "legendFormat": "Falha", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}
         ],
-        "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "fixed", "fixedColor": "green"}, "custom": {"fillOpacity": 80, "drawStyle": "bars"}}, "overrides": [{"matcher": {"id": "byName", "options": "Falha (ataque?)"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}]},
+        "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 80, "drawStyle": "bars"}}, "overrides": [{"matcher": {"id": "byName", "options": "Sucesso"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]}, {"matcher": {"id": "byName", "options": "Falha"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}]},
         "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "orientation": "vertical"}
       },
       {
-        "id": 8, "title": "Operacoes CRUD (barras empilhadas)", "type": "barchart",
-        "gridPos": {"x": 8, "y": 14, "w": 8, "h": 7},
-        "targets": [{"refId": "A", "expr": "sum(rate(app_crud_operations_total{status=\"success\"}[1m])) by (operation)", "legendFormat": "{{operation}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 80, "drawStyle": "bars", "stacking": {"mode": "normal", "group": "A"}}}},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
-      },
-      {
-        "id": 9, "title": "Distribuicao de Erros (pizza)", "type": "piechart",
-        "gridPos": {"x": 16, "y": 14, "w": 8, "h": 7},
+        "id": 8, "title": "Distribuicao de Erros", "type": "piechart",
+        "gridPos": {"x": 6, "y": 14, "w": 6, "h": 7},
         "targets": [{"refId": "A", "expr": "sum(app_errors_total) by (type)", "legendFormat": "{{type}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
-        "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "pie", "displayLabels": ["percent"], "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
+        "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "donut", "displayLabels": ["percent"], "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
       },
       {
-        "id": 10, "title": "Usuarios Ativos", "type": "stat",
-        "gridPos": {"x": 0, "y": 21, "w": 6, "h": 4},
+        "id": 9, "title": "Usuarios", "type": "stat",
+        "gridPos": {"x": 12, "y": 14, "w": 4, "h": 3},
         "targets": [{"refId": "A", "expr": "app_active_users", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}]}}},
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}]}}},
         "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
       },
       {
-        "id": 11, "title": "Registros Totais", "type": "stat",
-        "gridPos": {"x": 6, "y": 21, "w": 6, "h": 4},
+        "id": 10, "title": "Registros", "type": "stat",
+        "gridPos": {"x": 16, "y": 14, "w": 4, "h": 3},
         "targets": [{"refId": "A", "expr": "app_registrations_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
         "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "purple"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "purple"}]}}},
         "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
       },
       {
-        "id": 12, "title": "Falhas de Login (ataques?)", "type": "stat",
-        "gridPos": {"x": 12, "y": 21, "w": 6, "h": 4},
+        "id": 11, "title": "Falhas Login", "type": "stat",
+        "gridPos": {"x": 20, "y": 14, "w": 4, "h": 3},
         "targets": [{"refId": "A", "expr": "app_logins_total{status=\"failure\"}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "orange"}, {"value": 5, "color": "red"}]}}},
+        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 3, "color": "orange"}, {"value": 10, "color": "red"}]}}},
         "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
       },
       {
-        "id": 13, "title": "API Status", "type": "stat",
-        "gridPos": {"x": 18, "y": 21, "w": 6, "h": 4},
+        "id": 12, "title": "API", "type": "stat",
+        "gridPos": {"x": 12, "y": 17, "w": 4, "h": 4},
         "targets": [{"refId": "A", "expr": "app_health_status", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
         "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]}, "mappings": [{"type": "value", "options": {"1": {"text": "UP"}}}]}},
         "options": {"colorMode": "background", "graphMode": "none", "textMode": "value"}
       },
       {
-        "id": 14, "title": "Volume de Logs (barras)", "type": "barchart",
-        "gridPos": {"x": 0, "y": 25, "w": 12, "h": 7},
-        "targets": [{"refId": "A", "expr": "sum by (container) (count_over_time({container=\"node_app\"}[1m]))", "legendFormat": "Logs/min", "datasource": {"type": "loki", "uid": "loki"}, "queryType": "range"}],
-        "fieldConfig": {"defaults": {"custom": {"fillOpacity": 70, "drawStyle": "bars"}}},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
-      },
-      {
-        "id": 15, "title": "Servicos UP/DOWN", "type": "stat",
-        "gridPos": {"x": 12, "y": 25, "w": 12, "h": 7},
+        "id": 13, "title": "Servicos", "type": "stat",
+        "gridPos": {"x": 16, "y": 17, "w": 8, "h": 4},
         "targets": [{"refId": "A", "expr": "up{job=~\"node-app|prometheus|node-exporter\"}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
         "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "red"}, {"value": 1, "color": "green"}]}, "mappings": [{"type": "value", "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}}]}},
         "options": {"colorMode": "background", "graphMode": "none", "textMode": "auto", "reduceOptions": {"values": true, "calcs": ["lastNotNull"], "fields": "/^{{job}}$/"}}
       },
 
       {
-        "id": 16, "title": "Receita Total (R$)", "type": "stat",
-        "gridPos": {"x": 0, "y": 32, "w": 6, "h": 4},
+        "id": 14, "title": "Receita Total", "type": "stat",
+        "gridPos": {"x": 0, "y": 21, "w": 5, "h": 5},
         "targets": [{"refId": "A", "expr": "app_revenue_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "currencyBRL", "color": {"mode": "fixed", "fixedColor": "green"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}]}}},
+        "fieldConfig": {"defaults": {"unit": "currencyBRL", "color": {"mode": "fixed", "fixedColor": "green"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}]}, "decimals": 2}},
         "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
       },
       {
-        "id": 17, "title": "Pedidos por Status", "type": "barchart",
-        "gridPos": {"x": 6, "y": 32, "w": 9, "h": 7},
-        "targets": [{"refId": "A", "expr": "app_orders_total", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
-        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "custom": {"fillOpacity": 80, "drawStyle": "bars"}, "thresholds": {"mode": "absolute", "steps": [
-          {"value": null, "color": "text"},
-          {"value": 0, "color": "yellow"}
-        ]}, "mappings": [], "overrides": [
-          {"matcher": {"id": "byName", "options": "pending"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}}]},
-          {"matcher": {"id": "byName", "options": "paid"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
-          {"matcher": {"id": "byName", "options": "cancelled"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
-          {"matcher": {"id": "byName", "options": "shipped"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}]},
-          {"matcher": {"id": "byName", "options": "delivered"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}]}
-        ]}},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "orientation": "vertical"}
+        "id": 15, "title": "Produtos no Catalogo", "type": "stat",
+        "gridPos": {"x": 5, "y": 21, "w": 4, "h": 5},
+        "targets": [{"refId": "A", "expr": "app_products_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "blue"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}]}}},
+        "options": {"colorMode": "background", "graphMode": "none", "textMode": "auto"}
       },
       {
-        "id": 18, "title": "Pagamentos: Sucesso vs Falha", "type": "piechart",
-        "gridPos": {"x": 15, "y": 32, "w": 4, "h": 7},
-        "targets": [{"refId": "A", "expr": "sum(app_payments_total) by (status)", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}]}}, "overrides": [
-          {"matcher": {"id": "byName", "options": "success"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
-          {"matcher": {"id": "byName", "options": "failure"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
-          {"matcher": {"id": "byName", "options": "error"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
-        ]},
-        "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "pie", "displayLabels": ["percent"], "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
+        "id": 16, "title": "Checkouts Realizados", "type": "stat",
+        "gridPos": {"x": 9, "y": 21, "w": 4, "h": 5},
+        "targets": [{"refId": "A", "expr": "app_checkouts_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "purple"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "purple"}]}}},
+        "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
       },
       {
-        "id": 19, "title": "Itens no Carrinho", "type": "gauge",
-        "gridPos": {"x": 19, "y": 32, "w": 5, "h": 7},
+        "id": 17, "title": "Itens no Carrinho", "type": "gauge",
+        "gridPos": {"x": 13, "y": 21, "w": 5, "h": 5},
         "targets": [{"refId": "A", "expr": "app_cart_items_total", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}, {"value": 5, "color": "yellow"}, {"value": 15, "color": "orange"}, {"value": 25, "color": "red"}]}}},
+        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "#5794F2"}, {"value": 5, "color": "yellow"}, {"value": 15, "color": "orange"}, {"value": 25, "color": "red"}]}}},
         "options": {"orientation": "auto", "showThresholdLabels": true, "showThresholdMarkers": true, "reduceOptions": {"values": true, "calcs": ["lastNotNull"]}}
       },
       {
-        "id": 20, "title": "Total de Checkouts", "type": "stat",
-        "gridPos": {"x": 0, "y": 36, "w": 8, "h": 4},
-        "targets": [{"refId": "A", "expr": "app_checkouts_total", "legendFormat": "Conversao", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true}],
-        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "fixed", "fixedColor": "purple"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "blue"}]}}},
-        "options": {"colorMode": "background", "graphMode": "area", "textMode": "auto"}
+        "id": 18, "title": "Taxa de Conversao", "type": "stat",
+        "gridPos": {"x": 18, "y": 21, "w": 6, "h": 5},
+        "targets": [{"refId": "A", "expr": "(app_checkouts_total / app_registrations_total) * 100", "legendFormat": "Conversao", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "red"}, {"value": 10, "color": "orange"}, {"value": 30, "color": "green"}]}}},
+        "options": {"colorMode": "background", "graphMode": "none", "textMode": "auto"}
+      },
+
+      {
+        "id": 19, "title": "Pedidos por Status", "type": "barchart",
+        "gridPos": {"x": 0, "y": 26, "w": 12, "h": 8},
+        "targets": [{"refId": "A", "expr": "app_orders_total", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "custom": {"fillOpacity": 85, "drawStyle": "bars"}}, "overrides": [
+          {"matcher": {"id": "byName", "options": "pending"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#F2C94C"}}]},
+          {"matcher": {"id": "byName", "options": "paid"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#27AE60"}}]},
+          {"matcher": {"id": "byName", "options": "shipped"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#2D9CDB"}}]},
+          {"matcher": {"id": "byName", "options": "delivered"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#9B51E0"}}]},
+          {"matcher": {"id": "byName", "options": "cancelled"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#EB5757"}}]}
+        ]},
+        "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "orientation": "vertical"}
       },
       {
-        "id": 21, "title": "Estoque Baixo (< 5 unidades)", "type": "table",
-        "gridPos": {"x": 8, "y": 36, "w": 16, "h": 7},
+        "id": 20, "title": "Pagamentos", "type": "piechart",
+        "gridPos": {"x": 12, "y": 26, "w": 5, "h": 8},
+        "targets": [{"refId": "A", "expr": "sum(app_payments_total) by (status)", "legendFormat": "{{status}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}}, "overrides": [
+          {"matcher": {"id": "byName", "options": "success"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#27AE60"}}, {"id": "displayName", "value": "Aprovado"}]},
+          {"matcher": {"id": "byName", "options": "failure"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#EB5757"}}, {"id": "displayName", "value": "Recusado"}]}
+        ]},
+        "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "values": ["value", "percent"]}, "pieType": "donut", "displayLabels": ["percent"], "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
+      },
+      {
+        "id": 21, "title": "Estoque por Produto", "type": "bargauge",
+        "gridPos": {"x": 17, "y": 26, "w": 7, "h": 8},
+        "targets": [{"refId": "A", "expr": "app_stock_total", "legendFormat": "{{product}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true}],
+        "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "red"}, {"value": 5, "color": "orange"}, {"value": 15, "color": "green"}]}, "max": 50}},
+        "options": {"orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true, "reduceOptions": {"values": false, "calcs": ["lastNotNull"]}}
+      },
+
+      {
+        "id": 22, "title": "Estoque Baixo (< 5 un.)", "type": "table",
+        "gridPos": {"x": 0, "y": 34, "w": 12, "h": 7},
         "targets": [{"refId": "A", "expr": "app_stock_total < 5", "legendFormat": "{{product}}", "datasource": {"type": "prometheus", "uid": "prometheus"}, "range": true, "instant": true, "format": "table"}],
-        "fieldConfig": {"defaults": {"unit": "none", "custom": {"align": "center"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 0, "color": "red"}, {"value": 3, "color": "orange"}]}}, "overrides": [
-          {"matcher": {"id": "byName", "options": "product"}, "properties": [{"id": "displayName", "value": "Produto"}, {"id": "custom.width", "value": 200}]},
-          {"matcher": {"id": "byName", "options": "Value"}, "properties": [{"id": "displayName", "value": "Estoque"}, {"id": "unit", "value": "none"}]}
+        "fieldConfig": {"defaults": {"custom": {"align": "center"}, "thresholds": {"mode": "absolute", "steps": [{"value": null, "color": "green"}, {"value": 0, "color": "red"}, {"value": 3, "color": "orange"}]}}, "overrides": [
+          {"matcher": {"id": "byName", "options": "product"}, "properties": [{"id": "displayName", "value": "Produto"}, {"id": "custom.width", "value": 300}]},
+          {"matcher": {"id": "byName", "options": "Value"}, "properties": [{"id": "displayName", "value": "Estoque"}, {"id": "unit", "value": "none"}, {"id": "custom.cellOptions", "value": {"type": "color-background"}}]}
         ]},
         "options": {"showHeader": true, "sortBy": [{"displayName": "Estoque", "desc": false}]}
+      },
+      {
+        "id": 23, "title": "Volume de Logs", "type": "barchart",
+        "gridPos": {"x": 12, "y": 34, "w": 12, "h": 7},
+        "targets": [{"refId": "A", "expr": "sum by (container) (count_over_time({container=\"node_app\"}[1m]))", "legendFormat": "Logs/min", "datasource": {"type": "loki", "uid": "loki"}, "queryType": "range"}],
+        "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 70, "drawStyle": "bars"}, "color": {"mode": "fixed", "fixedColor": "#5794F2"}}},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
       }
     ]
   },
