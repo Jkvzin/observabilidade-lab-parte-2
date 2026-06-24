@@ -300,10 +300,18 @@ describe('API JJ Eletronicos - Ecommerce', () => {
     describe('Simulacoes Ecommerce', () => {
         let server;
         beforeAll((done) => {
-            server = app.listen(3001, () => done());
+            // Porta dinamica (0 = SO escolhe) para evitar EADDRINUSE
+            server = app.listen(process.env.PORT || 0, () => {
+                // Garante que as rotas de simulacao usem a mesma porta
+                process.env.PORT = server.address().port;
+                done();
+            });
         });
         afterAll((done) => {
-            server.close(() => done());
+            server.close(() => {
+                delete process.env.PORT;
+                done();
+            });
         });
 
         test('POST /simular/fluxo-completo deve retornar 200', async () => {

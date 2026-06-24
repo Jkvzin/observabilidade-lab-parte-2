@@ -93,10 +93,53 @@ const errorsTotal = new promClient.Counter({
     labelNames: ['type', 'endpoint']
 });
 
+// Inicializa o contador com zero para todos os tipos conhecidos,
+// assim painéis (ex: pie chart "Distribuição de Erros") nunca mostram NO DATA.
+['not_found', 'validation', 'auth', 'internal', 'rate_limit'].forEach(type => {
+    errorsTotal.inc({ type, endpoint: '/init' }, 0);
+});
+
+// Inicializa contadores de negócio com zero para todos os status conhecidos,
+// assim painéis "Pedidos por Status" e "Pagamentos" nunca mostram NO DATA.
+['pending', 'paid', 'shipped', 'delivered', 'cancelled'].forEach(status => {
+    ordersTotal.inc({ status }, 0);
+});
+['success', 'failure'].forEach(status => {
+    paymentsTotal.inc({ status }, 0);
+});
+
 const healthStatusGauge = new promClient.Gauge({
     name: 'app_health_status',
     help: 'Status de saúde da aplicação (1=UP, 0=DOWN)'
 });
+
+// ==================== METRICAS DE NEGOCIO AVANCADAS ====================
+const pageViewsTotal = new promClient.Counter({
+    name: 'app_page_views_total',
+    help: 'Visualizacoes de pagina (funil de vendas)',
+    labelNames: ['page']
+});
+
+const cartCreationsTotal = new promClient.Counter({
+    name: 'app_cart_creations_total',
+    help: 'Carrinhos criados (primeira adicao de item)',
+    labelNames: ['status']
+});
+
+const productSalesTotal = new promClient.Counter({
+    name: 'app_product_sales_total',
+    help: 'Produtos vendidos por nome',
+    labelNames: ['product']
+});
+
+// Inicializa com zero
+['/login', '/products', '/cart', '/checkout', '/orders'].forEach(page => {
+    pageViewsTotal.inc({ page }, 0);
+});
+['pending', 'success'].forEach(status => {
+    cartCreationsTotal.inc({ status }, 0);
+});
+// Product sales inicializado via seed (quando produto for vendido)
 
 // ==================== MIDDLEWARE DE METRICAS + LOGGING ====================
 app.use((req, res, next) => {
@@ -114,6 +157,20 @@ app.use((req, res, next) => {
             route: req.path,
             status_code: res.statusCode
         }, responseTimeInSeconds);
+
+        // Page views para funil de vendas
+        const pageMap = {
+            '/': '/login', '/index.html': '/login',
+            '/login': '/login', '/register': '/login',
+            '/products': '/products',
+            '/cart': '/cart',
+            '/checkout': '/checkout',
+            '/orders': '/orders',
+        };
+        const page = pageMap[req.path] || (req.path.startsWith('/products') ? '/products' : null);
+        if (page && res.statusCode < 400) {
+            pageViewsTotal.inc({ page });
+        }
 
         const logCtx = {
             method: req.method,
@@ -429,7 +486,11 @@ app.post('/cart', (req, res) => {
         }
         existing.quantity += quantity;
     } else {
+        const wasEmpty = cart.length === 0;
         cart.push({ productId: product.id, quantity });
+        if (wasEmpty) {
+            cartCreationsTotal.inc({ status: 'pending' });
+        }
     }
     cartItemsTotal.inc(quantity);
     logger.info('Item adicionado ao carrinho', { userId, productId, productName: product.name, quantity, unitPrice: product.price, action: 'cart_add' });
@@ -472,6 +533,8 @@ app.post('/checkout', checkoutLimiter, (req, res) => {
         const product = products.find(p => p.id === item.productId);
         product.stock -= item.quantity;
         stockByProduct.set({ product: product.name }, product.stock);
+        // Tracking de vendas por produto
+        productSalesTotal.inc({ product: product.name }, item.quantity);
         if (product.stock < 5) {
             logger.warn('Alerta de estoque baixo', { productId: product.id, productName: product.name, currentStock: product.stock, threshold: 5, action: 'low_stock_alert' });
         }
@@ -495,15 +558,17 @@ app.post('/checkout', checkoutLimiter, (req, res) => {
     };
     orders.push(order);
 
-    // Limpar carrinho
-    const cartSize = cart.length;
+    // Limpar carrinho — decrementa o gauge global apenas dos itens deste usuário
+    const totalQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
     carts[userId] = [];
 
     ordersTotal.inc({ status: 'pending' });
     checkoutsTotal.inc();
-    cartItemsTotal.set(0); // reset após checkout (aproximado)
+    cartItemsTotal.dec(totalQuantity);
+    // Carrinho convertido em pedido
+    cartCreationsTotal.inc({ status: 'success' });
 
-    logger.info('Checkout realizado', { userId, orderId: order.id, totalItems: cartSize, totalValue, action: 'checkout' });
+    logger.info('Checkout realizado', { userId, orderId: order.id, totalQuantity, totalValue, action: 'checkout' });
     res.status(201).json({ orderId: order.id, totalValue, status: 'pending', message: 'Pedido criado com sucesso!' });
 });
 
@@ -610,7 +675,10 @@ app.get('/incidente-delay', (req, res) => {
 // Faz chamadas HTTP reais ao proprio servidor para gerar metricas e logs
 function internalRequest(method, path, body, token) {
     return new Promise((resolve, reject) => {
-        const url = new URL(path, `http://localhost:${PORT}`);
+        // Usa process.env.PORT em tempo de execução para permitir
+        // que os testes injetem uma porta dinâmica (port 0)
+        const effectivePort = process.env.PORT || PORT;
+        const url = new URL(path, `http://localhost:${effectivePort}`);
         const data = body ? JSON.stringify(body) : null;
         const options = {
             hostname: url.hostname,
